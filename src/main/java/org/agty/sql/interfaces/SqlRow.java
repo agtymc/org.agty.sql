@@ -22,7 +22,19 @@ public interface SqlRow {
      * Все данные являются строкой
      * @return SqlRo
      */
+    SqlRow setValuesAsString(Boolean isString);
+    boolean isDataStringified();
+
+    /**
+     * @deprecated use {@link #setValuesAsString(Boolean)}
+     */
+    @Deprecated
     SqlRow setDataIsString(Boolean isString);
+
+    /**
+     * @deprecated use {@link #isDataStringified()}
+     */
+    @Deprecated
     boolean dataIsString();
 
     /**
@@ -183,5 +195,11 @@ public interface SqlRow {
      * Проверяет не пустой ли массив данных
      * @return bool
      */
+    boolean isNotEmpty();
+
+    /**
+     * @deprecated use {@link #isNotEmpty()}
+     */
+    @Deprecated
     boolean noEmpty();
 }

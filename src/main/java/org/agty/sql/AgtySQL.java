@@ -645,6 +645,10 @@ public class AgtySQL {
      */
     @Deprecated
     public boolean statementExecute(String query) {
+        return rawStatementExecute(query);
+    }
+
+    private boolean rawStatementExecute(String query) {
         debugMessageEnterInMethod("statementExecute()");
 
         try {
@@ -668,6 +672,10 @@ public class AgtySQL {
      */
     @Deprecated
     public ResultSet statementExecuteResultSet(String query) {
+        return rawStatementExecuteResultSet(query);
+    }
+
+    private ResultSet rawStatementExecuteResultSet(String query) {
         debugMessageEnterInMethod("statementExecuteResultSet()");
 
         try {
@@ -693,15 +701,15 @@ public class AgtySQL {
      */
     @Deprecated
     public ResultSet statementExecuteQuery(String query) {
+        return rawStatementExecuteQuery(query);
+    }
+
+    private ResultSet rawStatementExecuteQuery(String query) {
         debugMessageEnterInMethod("statementExecuteQuery()");
 
         try {
             logQuery(query);
-            //System.out.println(query);
             return getConnector().getStatement().executeQuery(query);
-            //Statement statement = getConnector().getStatement();
-            //statement.execute(query);
-            //return statement.getResultSet();
         } catch (Exception e) {
             throwError("AgtySQL.statementExecuteQuery()", e.getMessage() + "\n[" + query + "]\n");
         }
@@ -720,6 +728,10 @@ public class AgtySQL {
      */
     @Deprecated
     public Integer statementExecuteUpdate(String query) {
+        return rawStatementExecuteUpdate(query);
+    }
+
+    private Integer rawStatementExecuteUpdate(String query) {
         debugMessageEnterInMethod("statementExecuteUpdate()");
 
         try {
@@ -743,6 +755,10 @@ public class AgtySQL {
      */
     @Deprecated
     public Long statementExecuteLargeUpdate(String query) {
+        return rawStatementExecuteLargeUpdate(query);
+    }
+
+    private Long rawStatementExecuteLargeUpdate(String query) {
         debugMessageEnterInMethod("statementExecuteLargeUpdate()");
 
         try {
@@ -794,7 +810,7 @@ public class AgtySQL {
 
     public boolean execute(String query, boolean noRebuildQuery) {
         debugMessageEnterInMethod("execute(String query, boolean noRebuildQuery)");
-        return statementExecute(noRebuildQuery ? query : prepareQuery(query));
+        return rawStatementExecute(noRebuildQuery ? query : prepareQuery(query));
     }
 
     /**
@@ -807,8 +823,12 @@ public class AgtySQL {
      */
     @Deprecated
     public ResultSet executeResultSet(String query, boolean noRebuildQuery) {
+        return executeResultSetInternal(query, noRebuildQuery);
+    }
+
+    ResultSet executeResultSetInternal(String query, boolean noRebuildQuery) {
         debugMessageEnterInMethod("executeResultSet(String query, boolean noRebuildQuery)");
-        return statementExecuteResultSet(noRebuildQuery ? query : prepareQuery(query));
+        return rawStatementExecuteResultSet(noRebuildQuery ? query : prepareQuery(query));
     }
 
     /**
@@ -822,8 +842,12 @@ public class AgtySQL {
      */
     @Deprecated
     public ResultSet executeQuery(String query, boolean noRebuildQuery) {
+        return executeQueryInternal(query, noRebuildQuery);
+    }
+
+    ResultSet executeQueryInternal(String query, boolean noRebuildQuery) {
         debugMessageEnterInMethod("executeQuery()");
-        return statementExecuteQuery(noRebuildQuery ? query : prepareQuery(query));
+        return rawStatementExecuteQuery(noRebuildQuery ? query : prepareQuery(query));
     }
 
     /**
@@ -840,9 +864,9 @@ public class AgtySQL {
 
         if (query != null) {
             if (getDriverSqlObject().isSupportLargeUpdate()) {
-                result = statementExecuteLargeUpdate(query);
+                result = rawStatementExecuteLargeUpdate(query);
             } else {
-                Integer res = statementExecuteUpdate(query);
+                Integer res = rawStatementExecuteUpdate(query);
                 if (res != null) {
                     result = (long) res;
                 }
@@ -935,7 +959,7 @@ public class AgtySQL {
         debugMessageEnterInMethod("getFetchRow()");
 
         SqlRow returnData = RowFactory.newSqlRow();
-        returnData.setDataIsString(arguments.convertValueToString());
+        returnData.setValuesAsString(arguments.convertValueToString());
 
         if (errors.hasErrors() || resultSet == null) return RowFactory.emptyRow(); //Пустая строка
 
@@ -1216,6 +1240,10 @@ public class AgtySQL {
      */
     @Deprecated
     final public Long lastInsertId(Arguments arguments) {
+        return lastInsertIdInternal(arguments);
+    }
+
+    Long lastInsertIdInternal(Arguments arguments) {
         return metadataOperation.lastInsertId(arguments);
     }
 

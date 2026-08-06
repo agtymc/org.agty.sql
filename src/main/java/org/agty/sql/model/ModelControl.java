@@ -138,12 +138,12 @@ public class ModelControl {
         if (!agtySQL.hasErrors()) {
             if (idColumn.columnIsExist()) {
                 if (idColumn.valueIsDigit()) {
-                    arguments.setData(
+                    arguments.addData(
                             idColumn.getColumn(),
                             idColumn.getDigitValue()
                     );
                 } else {
-                    arguments.setData(
+                    arguments.addData(
                             idColumn.getColumn(),
                             idColumn.getStringValue()
                     );

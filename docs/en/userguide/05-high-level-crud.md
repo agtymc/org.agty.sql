@@ -80,8 +80,8 @@ At the current stage, `findAll(...)` is considered a deprecated alias.
 long insertedId = sql.insert(
         Arguments.builder()
                 .setTable("{users}")
-                .setData("id", 10)
-                .setData("name", "Alex")
+                .addData("id", 10)
+                .addData("name", "Alex")
 );
 ```
 
@@ -95,7 +95,7 @@ generated ID.
 long insertedId = sql.insert(
         Arguments.builder()
                 .setTable("{users}")
-                .setData("name", "Alex")
+                .addData("name", "Alex")
                 .setReturnLastInsertId(true)
 );
 ```
@@ -126,7 +126,7 @@ For H2 this means:
 SqlRow inserted = sql.insertAndGet(
         Arguments.builder()
                 .setTable("{users}")
-                .setData("name", "Alex"),
+                .addData("name", "Alex"),
         "id, name"
 );
 ```
@@ -137,7 +137,7 @@ There is also an overload without an explicit field list:
 SqlRow inserted = sql.insertAndGet(
         Arguments.builder()
                 .setTable("{users}")
-                .setData("name", "Alex")
+                .addData("name", "Alex")
 );
 ```
 
@@ -163,14 +163,14 @@ ArrayList<Arguments> batch = new ArrayList<>();
 batch.add(
         Arguments.builder()
                 .setTable("{users}")
-                .setData("id", 1)
-                .setData("name", "A")
+                .addData("id", 1)
+                .addData("name", "A")
 );
 batch.add(
         Arguments.builder()
                 .setTable("{users}")
-                .setData("id", 2)
-                .setData("name", "B")
+                .addData("id", 2)
+                .addData("name", "B")
 );
 
 sql.insert(batch);
@@ -182,7 +182,7 @@ sql.insert(batch);
 boolean updated = sql.update(
         Arguments.builder()
                 .setTable("{users}")
-                .setData("name", "Alex Updated")
+                .addData("name", "Alex Updated")
                 .setWhere("[id] = %d", 10)
 );
 ```
@@ -193,7 +193,7 @@ boolean updated = sql.update(
 SqlRow updated = sql.updateAndGet(
         Arguments.builder()
                 .setTable("{users}")
-                .setData("name", "Alex Updated")
+                .addData("name", "Alex Updated")
                 .setWhere("[id] = %d", 10),
         "id, name"
 );

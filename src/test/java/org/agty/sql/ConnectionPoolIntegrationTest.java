@@ -119,8 +119,8 @@ class ConnectionPoolIntegrationTest {
                 Arguments.builder()
                         .setTable(table)
                         .setPrimaryKey("id")
-                        .setData("id", id)
-                        .setData("string", value)
+                        .addData("id", id)
+                        .addData("string", value)
                         .setReturnLastInsertId(true)
         );
 

@@ -72,12 +72,12 @@ public class ModelArgumentsBuilder {
 
     private void setDataToArguments(Arguments arguments, ColumnEntity column) {
         if (column.valueIsDigit() && !column.columnIsString()) {
-            arguments.setData(
+            arguments.addData(
                     column.getColumn(),
                     column.getDigitValue()
             );
         } else {
-            arguments.setData(
+            arguments.addData(
                     column.getColumn(),
                     column.getStringValue()
             );

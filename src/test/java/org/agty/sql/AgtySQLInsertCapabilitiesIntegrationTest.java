@@ -62,7 +62,7 @@ class AgtySQLInsertCapabilitiesIntegrationTest {
             long insertedId = sql.insert(
                     Arguments.builder()
                             .setTable(table)
-                            .setData("string", "generated")
+                            .addData("string", "generated")
                             .setReturnLastInsertId(true)
             );
 
@@ -91,10 +91,10 @@ class AgtySQLInsertCapabilitiesIntegrationTest {
                     Arguments.builder()
                             .setTable(table)
                             .setPrimaryKey("id")
-                            .setData("id", expectedId)
-                            .setData("string", "manual-id")
-                            .setData("integers", 1)
-                            .setData("bool", true)
+                            .addData("id", expectedId)
+                            .addData("string", "manual-id")
+                            .addData("integers", 1)
+                            .addData("bool", true)
                             .setReturnLastInsertId(true)
             );
 
@@ -121,7 +121,7 @@ class AgtySQLInsertCapabilitiesIntegrationTest {
             SqlRow inserted = sql.insertAndGet(
                     Arguments.builder()
                             .setTable(table)
-                            .setData("string", "returning"),
+                            .addData("string", "returning"),
                     "id, string"
             );
 
@@ -145,7 +145,7 @@ class AgtySQLInsertCapabilitiesIntegrationTest {
             InsertedRowEntity inserted = sql.insertAndGet(
                     Arguments.builder()
                             .setTable(table)
-                            .setData("string", "entity-return"),
+                            .addData("string", "entity-return"),
                     InsertedRowEntity.class
             );
 
@@ -170,7 +170,7 @@ class AgtySQLInsertCapabilitiesIntegrationTest {
             InsertedRowEntity inserted = sql.insert(
                     Arguments.builder()
                             .setTable(table)
-                            .setData("string", "short-insert"),
+                            .addData("string", "short-insert"),
                     InsertedRowEntity.class
             );
 
@@ -196,7 +196,7 @@ class AgtySQLInsertCapabilitiesIntegrationTest {
             SqlRow updated = sql.updateAndGet(
                     Arguments.builder()
                             .setTable(table)
-                            .setData("string", "after")
+                            .addData("string", "after")
                             .setWhere("[id] = %d", 7),
                     "id, string"
             );
@@ -222,7 +222,7 @@ class AgtySQLInsertCapabilitiesIntegrationTest {
             UpdatedRowEntity updated = sql.updateAndGet(
                     Arguments.builder()
                             .setTable(table)
-                            .setData("string", "after-entity")
+                            .addData("string", "after-entity")
                             .setWhere("[id] = %d", 9),
                     UpdatedRowEntity.class
             );
@@ -249,7 +249,7 @@ class AgtySQLInsertCapabilitiesIntegrationTest {
             UpdatedRowEntity updated = sql.update(
                     Arguments.builder()
                             .setTable(table)
-                            .setData("string", "after-short")
+                            .addData("string", "after-short")
                             .setWhere("[id] = %d", 13),
                     UpdatedRowEntity.class
             );
@@ -273,7 +273,7 @@ class AgtySQLInsertCapabilitiesIntegrationTest {
                     AgtySqlException.class,
                     () -> sql.updateAndGet(
                             Arguments.builder()
-                                    .setData("string", "after")
+                                    .addData("string", "after")
                                     .setWhere("[id] = %d", 1),
                             "id, string"
                     )
@@ -298,7 +298,7 @@ class AgtySQLInsertCapabilitiesIntegrationTest {
                     () -> sql.updateAndGet(
                             Arguments.builder()
                                     .setTable(table)
-                                    .setData("string", "after-missing-where"),
+                                    .addData("string", "after-missing-where"),
                             "id, string"
                     )
             );
@@ -322,7 +322,7 @@ class AgtySQLInsertCapabilitiesIntegrationTest {
             SqlRow updated = sql.updateAndGet(
                     Arguments.builder()
                             .setTable(table)
-                            .setData("string", "after-multi")
+                            .addData("string", "after-multi")
                             .setWhere("[id] IN (41, 42)"),
                     "id, string"
             );
@@ -415,10 +415,10 @@ class AgtySQLInsertCapabilitiesIntegrationTest {
         long insertedId = sql.insert(
                 Arguments.builder()
                         .setTable(table)
-                        .setData("id", id)
-                        .setData("string", value)
-                        .setData("integers", 1)
-                        .setData("bool", true)
+                        .addData("id", id)
+                        .addData("string", value)
+                        .addData("integers", 1)
+                        .addData("bool", true)
         );
 
         Assertions.assertEquals(0L, insertedId);

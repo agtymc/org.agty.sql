@@ -94,9 +94,9 @@ This means: skip `40` rows and return `20`.
 ```java
 Arguments.builder()
         .setTable("{users}")
-        .setData("name", "Alex")
-        .setData("age", 30)
-        .setData("active", true);
+        .addData("name", "Alex")
+        .addData("age", 30)
+        .addData("active", true);
 ```
 
 Supported scalar types:
@@ -166,7 +166,7 @@ have an explicit need, you can ignore it in application code.
 long id = sql.insert(
         Arguments.builder()
                 .setTable("{users}")
-                .setData("name", "Alex")
+                .addData("name", "Alex")
                 .setReturnLastInsertId(true)
 );
 ```
@@ -241,8 +241,8 @@ Arguments.builder()
 ```java
 Arguments.builder()
         .setTable("{users}")
-        .setData("name", "Alex")
-        .setData("age", 30)
+        .addData("name", "Alex")
+        .addData("age", 30)
         .setWhere("[id] = %d", 10);
 ```
 

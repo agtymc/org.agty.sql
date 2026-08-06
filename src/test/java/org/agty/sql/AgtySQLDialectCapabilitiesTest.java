@@ -135,7 +135,7 @@ class AgtySQLDialectCapabilitiesTest {
                     () -> sql.updateAndGet(
                             Arguments.builder()
                                     .setTable("{test_table}")
-                                    .setData("string", "after")
+                                    .addData("string", "after")
                                     .setWhere("[id] = %d", 1),
                             "id, string"
                     )

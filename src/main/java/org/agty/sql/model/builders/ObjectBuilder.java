@@ -44,7 +44,7 @@ public class ObjectBuilder {
                 newObjectInstance = object.getClass().getDeclaredConstructor().newInstance();
             }
 
-            if (sqlRow.noEmpty()) {
+            if (sqlRow.isNotEmpty()) {
                 for (Field field : newObjectInstance.getClass().getDeclaredFields()) {
                     field.setAccessible(true);
 

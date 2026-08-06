@@ -40,8 +40,8 @@ class AgtySQLCrossDbIntegrationTest {
             Assertions.assertTrue(sql.update(
                     Arguments.builder()
                             .setTable(table)
-                            .setData("string", "value-2-updated")
-                            .setData("integers", 25)
+                            .addData("string", "value-2-updated")
+                            .addData("integers", 25)
                             .setWhere("[id] = %d", 2)
             ));
 
@@ -87,10 +87,10 @@ class AgtySQLCrossDbIntegrationTest {
             long insertedId = sql.insert(
                     Arguments.builder()
                             .setTable(table)
-                            .setData("id", i)
-                            .setData("string", "value-" + i)
-                            .setData("integers", i * 10)
-                            .setData("bool", i % 2 == 0)
+                            .addData("id", i)
+                            .addData("string", "value-" + i)
+                            .addData("integers", i * 10)
+                            .addData("bool", i % 2 == 0)
             );
 
             Assertions.assertEquals(0L, insertedId);

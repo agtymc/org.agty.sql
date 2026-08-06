@@ -9,13 +9,13 @@ try {
     sql.insert(
             Arguments.builder()
                     .setTable("{users}")
-                    .setData("name", "Alex")
+                    .addData("name", "Alex")
     );
 
     sql.update(
             Arguments.builder()
                     .setTable("{accounts}")
-                    .setData("balance", 100)
+                    .addData("balance", 100)
                     .setWhere("[id] = %d", 1)
     );
 

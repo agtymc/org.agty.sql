@@ -77,7 +77,7 @@ public class RowData extends LinkedHashMap<String, Object> implements SqlRow {
      */
     @Override
     public SqlRow convertFromArguments(Arguments arguments) {
-        Map<String, Object> data = arguments.getDataArray();
+        Map<String, Object> data = arguments.getDataMap();
 
         for (Map.Entry<String, Object> entry : data.entrySet()) {
             setData(entry.getKey(), entry.getValue());
@@ -93,14 +93,32 @@ public class RowData extends LinkedHashMap<String, Object> implements SqlRow {
      * @return SqlRo
      */
     @Override
-    public SqlRow setDataIsString(Boolean isString) {
+    public SqlRow setValuesAsString(Boolean isString) {
         this.dataIsString = isString;
         return this;
     }
 
     @Override
-    public boolean dataIsString() {
+    public boolean isDataStringified() {
         return dataIsString;
+    }
+
+    /**
+     * @deprecated use {@link #setValuesAsString(Boolean)}
+     */
+    @Override
+    @Deprecated
+    public SqlRow setDataIsString(Boolean isString) {
+        return setValuesAsString(isString);
+    }
+
+    /**
+     * @deprecated use {@link #isDataStringified()}
+     */
+    @Override
+    @Deprecated
+    public boolean dataIsString() {
+        return isDataStringified();
     }
 
     /**
@@ -138,7 +156,7 @@ public class RowData extends LinkedHashMap<String, Object> implements SqlRow {
     public String getString(String key) {
         Object value = getValue(key);
         if (value == null) return null;
-        return dataIsString() ? value.toString() : String.valueOf(value) ;
+        return isDataStringified() ? value.toString() : String.valueOf(value) ;
     }
 
     /**
@@ -194,7 +212,7 @@ public class RowData extends LinkedHashMap<String, Object> implements SqlRow {
             return bigIntegerValue.intValue();
         }
 
-        return dataIsString() ? Integer.parseInt(value.toString()) : (Integer) value;
+        return isDataStringified() ? Integer.parseInt(value.toString()) : (Integer) value;
     }
 
     /**
@@ -216,7 +234,7 @@ public class RowData extends LinkedHashMap<String, Object> implements SqlRow {
             return bigIntegerValue.longValue();
         }
 
-        return dataIsString() ? Long.parseLong(value.toString()) : (Long) value;
+        return isDataStringified() ? Long.parseLong(value.toString()) : (Long) value;
     }
 
     /**
@@ -229,7 +247,7 @@ public class RowData extends LinkedHashMap<String, Object> implements SqlRow {
     public Double getDouble(String key) {
         Object value = getValue(key);
         if (value == null) return null;
-        return dataIsString() ? Double.parseDouble(value.toString()) : (Double) value;
+        return isDataStringified() ? Double.parseDouble(value.toString()) : (Double) value;
     }
 
     /**
@@ -242,7 +260,7 @@ public class RowData extends LinkedHashMap<String, Object> implements SqlRow {
     public Float getFloat(String key) {
         Object value = getValue(key);
         if (value == null) return null;
-        return dataIsString() ? Float.parseFloat(value.toString()) : (Float) value;
+        return isDataStringified() ? Float.parseFloat(value.toString()) : (Float) value;
     }
 
     /**
@@ -255,7 +273,7 @@ public class RowData extends LinkedHashMap<String, Object> implements SqlRow {
     public Short getShort(String key) {
         Object value = getValue(key);
         if (value == null) return null;
-        return dataIsString() ? Short.parseShort(value.toString()) : (Short) value;
+        return isDataStringified() ? Short.parseShort(value.toString()) : (Short) value;
     }
 
     /**
@@ -288,8 +306,17 @@ public class RowData extends LinkedHashMap<String, Object> implements SqlRow {
      * @return bool
      */
     @Override
-    public boolean noEmpty() {
+    public boolean isNotEmpty() {
         return !super.isEmpty();
+    }
+
+    /**
+     * @deprecated use {@link #isNotEmpty()}
+     */
+    @Override
+    @Deprecated
+    public boolean noEmpty() {
+        return isNotEmpty();
     }
 
     /**

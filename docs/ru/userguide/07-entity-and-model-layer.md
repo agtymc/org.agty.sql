@@ -66,7 +66,7 @@ Object id = sql.saveEntity(user, "id");
 MyUser inserted = sql.insertAndGet(
         Arguments.builder()
                 .setTable("{users}")
-                .setData("name", "Alex"),
+                .addData("name", "Alex"),
         MyUser.class
 );
 ```
@@ -75,7 +75,7 @@ MyUser inserted = sql.insertAndGet(
 MyUser updated = sql.updateAndGet(
         Arguments.builder()
                 .setTable("{users}")
-                .setData("name", "Alex Updated")
+                .addData("name", "Alex Updated")
                 .setWhere("[id] = %d", 10),
         MyUser.class
 );
@@ -92,7 +92,7 @@ MyUser insertedByQuery = sql.insertAndGet(
 MyUser insertedShort = sql.insert(
         Arguments.builder()
                 .setTable("{users}")
-                .setData("name", "Alex"),
+                .addData("name", "Alex"),
         MyUser.class
 );
 ```
@@ -101,7 +101,7 @@ MyUser insertedShort = sql.insert(
 MyUser updatedShort = sql.update(
         Arguments.builder()
                 .setTable("{users}")
-                .setData("name", "Alex Updated")
+                .addData("name", "Alex Updated")
                 .setWhere("[id] = %d", 10),
         MyUser.class
 );

@@ -608,7 +608,7 @@ public class PgSQL implements Sql {
                         .setQuoteColumn(getQuoteColumn())
                         .setQuoteValue(getQuoteValue())
                         .setColumn(key)
-                        .setValue(arguments.getFromData(key))
+                        .setValue(arguments.getData(key))
                         .setNoStringEncode(arguments.noStringEncode())
                         .build()
             );

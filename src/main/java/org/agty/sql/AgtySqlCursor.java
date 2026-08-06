@@ -47,7 +47,7 @@ public final class AgtySqlCursor implements AutoCloseable {
             }
 
             SqlRow row = RowFactory.newSqlRow();
-            row.setDataIsString(arguments.convertValueToString());
+            row.setValuesAsString(arguments.convertValueToString());
 
             ResultSetMetaData metaData = resultSet.getMetaData();
             for (int i = 1; i <= metaData.getColumnCount(); ++i) {

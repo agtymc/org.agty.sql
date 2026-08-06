@@ -41,7 +41,7 @@ entity/model-слоем.
     <dependency>
         <groupId>org.agty</groupId>
         <artifactId>org-agty-sql</artifactId>
-        <version>2.0.0</version>
+        <version>2.0.1</version>
     </dependency>
 </dependencies>
 ```
@@ -68,10 +68,10 @@ entity/model-слоем.
 
 ```bash
 mvn install:install-file \
-  -Dfile=path/to/org-agty-sql-2.0.0.jar \
+  -Dfile=path/to/org-agty-sql-2.0.1.jar \
   -DgroupId=org.agty \
   -DartifactId=org-agty-sql \
-  -Dversion=2.0.0 \
+  -Dversion=2.0.1 \
   -Dpackaging=jar
 ```
 
@@ -81,7 +81,7 @@ mvn install:install-file \
 <dependency>
     <groupId>org.agty</groupId>
     <artifactId>org-agty-sql</artifactId>
-    <version>2.0.0</version>
+    <version>2.0.1</version>
 </dependency>
 ```
 

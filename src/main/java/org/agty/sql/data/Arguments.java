@@ -133,8 +133,16 @@ public class Arguments {
      * Force rebuild query
      * @return bool
      */
-    public boolean forceRequery() {
+    public boolean forceRebuildQuery() {
         return forceRebuildQuery;
+    }
+
+    /**
+     * @deprecated use {@link #forceRebuildQuery()}
+     */
+    @Deprecated
+    public boolean forceRequery() {
+        return forceRebuildQuery();
     }
 
     /**
@@ -613,45 +621,109 @@ public class Arguments {
      * @param value содержимое поля.
      * @return текущий объект Arguments
      */
-    public Arguments setData(String field, String value) {
+    public Arguments addData(String field, String value) {
         if (value != null && value.endsWith("\\")) value = value.replaceAll("\\\\+$", "");
         dataPut(field, value);
         return this;
     }
 
+    public Arguments addData(String field, Integer value) {
+        dataPut(field, value);
+        return this;
+    }
+
+    public Arguments addData(String field, Long value) {
+        dataPut(field, value);
+        return this;
+    }
+
+    public Arguments addData(String field, Short value) {
+        dataPut(field, value);
+        return this;
+    }
+
+    public Arguments addData(String field, Boolean value) {
+        dataPut(field, value);
+        return this;
+    }
+
+    public Arguments addData(String field, Float value) {
+        dataPut(field, value);
+        return this;
+    }
+
+    public Arguments addData(String field, Double value) {
+        dataPut(field, value);
+        return this;
+    }
+
+    public Arguments addData(String field, Character value) {
+        dataPut(field, value);
+        return this;
+    }
+
+    /**
+     * @deprecated use {@link #addData(String, String)}
+     */
+    @Deprecated
+    public Arguments setData(String field, String value) {
+        return addData(field, value);
+    }
+
+    /**
+     * @deprecated use {@link #addData(String, Integer)}
+     */
+    @Deprecated
     public Arguments setData(String field, Integer value) {
-        dataPut(field, value);
-        return this;
+        return addData(field, value);
     }
 
+    /**
+     * @deprecated use {@link #addData(String, Long)}
+     */
+    @Deprecated
     public Arguments setData(String field, Long value) {
-        dataPut(field, value);
-        return this;
+        return addData(field, value);
     }
 
+    /**
+     * @deprecated use {@link #addData(String, Short)}
+     */
+    @Deprecated
     public Arguments setData(String field, Short value) {
-        dataPut(field, value);
-        return this;
+        return addData(field, value);
     }
 
+    /**
+     * @deprecated use {@link #addData(String, Boolean)}
+     */
+    @Deprecated
     public Arguments setData(String field, Boolean value) {
-        dataPut(field, value);
-        return this;
+        return addData(field, value);
     }
 
+    /**
+     * @deprecated use {@link #addData(String, Float)}
+     */
+    @Deprecated
     public Arguments setData(String field, Float value) {
-        dataPut(field, value);
-        return this;
+        return addData(field, value);
     }
 
+    /**
+     * @deprecated use {@link #addData(String, Double)}
+     */
+    @Deprecated
     public Arguments setData(String field, Double value) {
-        dataPut(field, value);
-        return this;
+        return addData(field, value);
     }
 
+    /**
+     * @deprecated use {@link #addData(String, Character)}
+     */
+    @Deprecated
     public Arguments setData(String field, Character value) {
-        dataPut(field, value);
-        return this;
+        return addData(field, value);
     }
 
     private void dataPut(String field, Object value) {
@@ -663,8 +735,16 @@ public class Arguments {
      *
      * @param field имя поля.
      */
-    public void removeFromData(String field) {
+    public void removeData(String field) {
         data.remove(field);
+    }
+
+    /**
+     * @deprecated use {@link #removeData(String)}
+     */
+    @Deprecated
+    public void removeFromData(String field) {
+        removeData(field);
     }
 
     /**
@@ -688,8 +768,16 @@ public class Arguments {
      *
      * @return копия коллекции массива с данными.
      */
-    public LinkedHashMap<String, Object> getDataArray() {
+    public LinkedHashMap<String, Object> getDataMap() {
         return new LinkedHashMap<String, Object>(data);
+    }
+
+    /**
+     * @deprecated use {@link #getDataMap()}
+     */
+    @Deprecated
+    public LinkedHashMap<String, Object> getDataArray() {
+        return getDataMap();
     }
 
     /**
@@ -698,8 +786,16 @@ public class Arguments {
      * @param key ключ данных.
      * @return объект содержимого.
      */
-    public Object getFromData(String key) {
+    public Object getData(String key) {
         return data.get(key);
+    }
+
+    /**
+     * @deprecated use {@link #getData(String)}
+     */
+    @Deprecated
+    public Object getFromData(String key) {
+        return getData(key);
     }
 
     /**

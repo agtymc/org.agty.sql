@@ -25,13 +25,31 @@ public class RowDataEmpty implements SqlRow {
     }
 
     @Override
-    public SqlRow setDataIsString(Boolean isString) {
+    public SqlRow setValuesAsString(Boolean isString) {
         return this;
     }
 
     @Override
-    public boolean dataIsString() {
+    public boolean isDataStringified() {
         return false;
+    }
+
+    /**
+     * @deprecated use {@link #setValuesAsString(Boolean)}
+     */
+    @Override
+    @Deprecated
+    public SqlRow setDataIsString(Boolean isString) {
+        return setValuesAsString(isString);
+    }
+
+    /**
+     * @deprecated use {@link #isDataStringified()}
+     */
+    @Override
+    @Deprecated
+    public boolean dataIsString() {
+        return isDataStringified();
     }
 
     @Override
@@ -95,8 +113,17 @@ public class RowDataEmpty implements SqlRow {
     }
 
     @Override
-    public boolean noEmpty() {
+    public boolean isNotEmpty() {
         return false;
+    }
+
+    /**
+     * @deprecated use {@link #isNotEmpty()}
+     */
+    @Override
+    @Deprecated
+    public boolean noEmpty() {
+        return isNotEmpty();
     }
 
     @Override

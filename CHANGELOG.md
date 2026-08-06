@@ -2,9 +2,15 @@
 
 ## Unreleased
 
+## 2.0.1 - 2026-08-06
+
 ### Changed
 - Maven publication was reconfigured from the legacy WebDAV repository to GitHub Packages at `https://maven.pkg.github.com/agtymc/org.agty.sql`.
 - Maven server id for publishing and consuming artifacts was renamed from `agtymc` to `org.agty.sql`.
+
+### Deprecated
+- `Arguments.setData(...)` was superseded by `Arguments.addData(...)` and remains only as a deprecated compatibility alias.
+- `Arguments.getFromData(...)`, `Arguments.removeFromData(...)`, `Arguments.getDataArray(...)`, `Arguments.forceRequery()`, `SqlRow.setDataIsString(...)`, `SqlRow.dataIsString()`, and `SqlRow.noEmpty()` were superseded by clearer names and remain only as deprecated compatibility aliases.
 
 ### Added
 - GitHub Actions workflow for publishing Maven artifacts to GitHub Packages.

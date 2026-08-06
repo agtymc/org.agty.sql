@@ -20,15 +20,15 @@ class ArgumentsTest {
         Arguments arguments = Arguments.builder()
                 .setTable("{users}")
                 .setActionField("id")
-                .setData("name", "alice")
-                .setData("age", 42)
+                .addData("name", "alice")
+                .addData("age", 42)
                 .addColumn("id")
                 .addColumn("name");
 
         assertEquals("{users}", arguments.getTable());
         assertEquals("id", arguments.getActionField());
-        assertEquals("alice", arguments.getFromData("name"));
-        assertEquals(42, arguments.getFromData("age"));
+        assertEquals("alice", arguments.getData("name"));
+        assertEquals(42, arguments.getData("age"));
         assertEquals(2, arguments.dataSize());
         assertEquals(2, arguments.getColumns().size());
         assertTrue(arguments.hasData());
@@ -46,7 +46,7 @@ class ArgumentsTest {
 
         assertTrue(arguments.noStringEncode());
         assertTrue(arguments.noRebuildQuery());
-        assertTrue(arguments.forceRequery());
+        assertTrue(arguments.forceRebuildQuery());
         assertTrue(arguments.returnLastInsertId());
     }
 }

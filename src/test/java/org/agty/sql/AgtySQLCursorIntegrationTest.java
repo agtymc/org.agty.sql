@@ -18,6 +18,7 @@ class AgtySQLCursorIntegrationTest {
 
     @ParameterizedTest(name = "cursor lifecycle: {0}")
     @MethodSource("sqlProfiles")
+    @SuppressWarnings("deprecation")
     void managesListCursorLifecycle(TestDatabaseProfile profile) {
         AgtySQL sql = profile.createSql();
         String table = "{integration_cursor_" + profile.server() + "}";
@@ -109,10 +110,10 @@ class AgtySQLCursorIntegrationTest {
             sql.insert(
                     Arguments.builder()
                             .setTable(table)
-                            .setData("id", i)
-                            .setData("string", "value-" + i)
-                            .setData("integers", i * 10)
-                            .setData("bool", i % 2 == 0)
+                            .addData("id", i)
+                            .addData("string", "value-" + i)
+                            .addData("integers", i * 10)
+                            .addData("bool", i % 2 == 0)
             );
             Assertions.assertFalse(sql.hasErrors(), sql.getErrors());
         }

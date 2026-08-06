@@ -171,8 +171,8 @@ SqlRow row = sql.fetch(
 sql.insert(
         Arguments.builder()
                 .setTable("{users}")
-                .setData("name", "Alex")
-                .setData("age", 30)
+                .addData("name", "Alex")
+                .addData("age", 30)
 );
 ```
 

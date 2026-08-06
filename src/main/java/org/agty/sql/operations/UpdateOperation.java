@@ -143,9 +143,9 @@ public final class UpdateOperation {
                 .setEmulateMode(source.isEmulateMode())
                 .setNoStringEncode(source.noStringEncode())
                 .setNoRebuildQuery(source.noRebuildQuery())
-                .setForceRebuildQuery(source.forceRequery());
+                .setForceRebuildQuery(source.forceRebuildQuery());
 
-        source.getDataArray().forEach((key, value) -> putData(copy, key, value));
+        source.getDataMap().forEach((key, value) -> putData(copy, key, value));
         source.getColumns().forEach(copy::addColumn);
 
         if (source.hasLimit()) {
@@ -158,25 +158,25 @@ public final class UpdateOperation {
 
     private void putData(Arguments arguments, String key, Object value) {
         if (value == null) {
-            arguments.setData(key, (String) null);
+            arguments.addData(key, (String) null);
         } else if (value instanceof String stringValue) {
-            arguments.setData(key, stringValue);
+            arguments.addData(key, stringValue);
         } else if (value instanceof Integer integerValue) {
-            arguments.setData(key, integerValue);
+            arguments.addData(key, integerValue);
         } else if (value instanceof Long longValue) {
-            arguments.setData(key, longValue);
+            arguments.addData(key, longValue);
         } else if (value instanceof Short shortValue) {
-            arguments.setData(key, shortValue);
+            arguments.addData(key, shortValue);
         } else if (value instanceof Boolean booleanValue) {
-            arguments.setData(key, booleanValue);
+            arguments.addData(key, booleanValue);
         } else if (value instanceof Float floatValue) {
-            arguments.setData(key, floatValue);
+            arguments.addData(key, floatValue);
         } else if (value instanceof Double doubleValue) {
-            arguments.setData(key, doubleValue);
+            arguments.addData(key, doubleValue);
         } else if (value instanceof Character characterValue) {
-            arguments.setData(key, characterValue);
+            arguments.addData(key, characterValue);
         } else {
-            arguments.setData(key, String.valueOf(value));
+            arguments.addData(key, String.valueOf(value));
         }
     }
 }
