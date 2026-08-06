@@ -7,31 +7,44 @@
     <groupId>org.agty</groupId>
     <artifactId>org-agty-sql</artifactId>
     <version>2.0.0</version>
+    <name>org.agty.sql</name>
+    <description>Lightweight Java SQL library with a high-level API, JDBC access, and cursor-style reading.</description>
+    <url>https://github.com/agtymc/org.agty.sql</url>
+
+    <licenses>
+        <license>
+            <name>Apache License, Version 2.0</name>
+            <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
+
+    <developers>
+        <developer>
+            <name>Vladimir V</name>
+            <email>kvv@agty.org</email>
+        </developer>
+    </developers>
+
+    <scm>
+        <connection>scm:git:https://github.com/agtymc/org.agty.sql.git</connection>
+        <developerConnection>scm:git:ssh://git@github.com/agtymc/org.agty.sql.git</developerConnection>
+        <url>https://github.com/agtymc/org.agty.sql</url>
+    </scm>
+
+    <distributionManagement>
+        <repository>
+            <id>org.agty.sql</id>
+            <name>GitHub Packages</name>
+            <url>https://maven.pkg.github.com/agtymc/org.agty.sql</url>
+        </repository>
+    </distributionManagement>
 
     <properties>
         <maven.compiler.source>18</maven.compiler.source>
         <maven.compiler.target>18</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
-
-    <profiles>
-        <profile>
-            <id>elf.agty.maven</id>
-            <distributionManagement>
-                <repository>
-                    <id>elf.agty.maven</id>
-                    <url>dav:http://maven.agty.elf/</url>
-                </repository>
-            </distributionManagement>
-        </profile>
-    </profiles>
-
-    <repositories>
-        <repository>
-            <id>elf.agty.maven</id>
-            <url>dav:http://maven.agty.elf/</url>
-        </repository>
-    </repositories>
 
     <dependencies>
         <dependency>
@@ -70,17 +83,8 @@
     </dependencies>
 
     <build>
-        <extensions>
-            <extension>
-                <!--Позволяет отправлять (деплоить) на WEBDAV-->
-                <groupId>org.apache.maven.wagon</groupId>
-                <artifactId>wagon-webdav-jackrabbit</artifactId>
-                <version>3.5.2</version>
-            </extension>
-        </extensions>
         <pluginManagement>
             <plugins>
-                <!--Позволяет запускать тесты-->
                 <plugin>
                     <artifactId>maven-surefire-plugin</artifactId>
                     <version>2.22.2</version>

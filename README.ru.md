@@ -5,6 +5,7 @@ high-level API, низкоуровневым JDBC-доступом, курсор
 entity/model-слоем.
 
 Проект собирается через Maven и сейчас ориентирован на Java 18.
+Исходный репозиторий: `https://github.com/agtymc/org.agty.sql`
 
 ## Документация
 
@@ -16,17 +17,26 @@ entity/model-слоем.
 
 ## Подключение Через Maven Из GitHub-Репозитория
 
-Когда появится ссылка на GitHub Maven repository, подставьте ее вместо
-заглушки ниже.
+Проект настроен на публикацию в GitHub Packages:
+
+- Репозиторий: `https://github.com/agtymc/org.agty.sql`
+- Maven registry: `https://maven.pkg.github.com/agtymc/org.agty.sql`
+- Maven server id: `org.agty.sql`
+
+Добавьте Maven-репозиторий:
 
 ```xml
 <repositories>
     <repository>
-        <id>github-org-agty-sql</id>
-        <url>GITHUB_MAVEN_REPOSITORY_URL</url>
+        <id>org.agty.sql</id>
+        <url>https://maven.pkg.github.com/agtymc/org.agty.sql</url>
     </repository>
 </repositories>
+```
 
+Затем добавьте зависимость:
+
+```xml
 <dependencies>
     <dependency>
         <groupId>org.agty</groupId>
@@ -34,6 +44,20 @@ entity/model-слоем.
         <version>2.0.0</version>
     </dependency>
 </dependencies>
+```
+
+Для GitHub Packages обычно нужна аутентификация. В `~/.m2/settings.xml`:
+
+```xml
+<settings>
+    <servers>
+        <server>
+            <id>org.agty.sql</id>
+            <username>YOUR_GITHUB_LOGIN</username>
+            <password>YOUR_GITHUB_TOKEN</password>
+        </server>
+    </servers>
+</settings>
 ```
 
 ## Подключение Через JAR-Файл
@@ -63,3 +87,7 @@ mvn install:install-file \
 
 2. Хранить JAR рядом с приложением и подключать его вручную в classpath, если
 сборочный процесс не использует установку артефакта в Maven.
+
+## Лицензия
+
+Apache License 2.0. См. `LICENSE`.

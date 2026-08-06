@@ -23,6 +23,7 @@ logs/
 databases/
 config.ini
 \!files/
+package
 
 # Local project instructions
 AGENTS.md

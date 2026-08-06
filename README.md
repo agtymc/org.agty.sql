@@ -5,6 +5,7 @@ API, low-level JDBC access, cursor-style reading, and convenience support for
 entity/model mapping.
 
 The project is built with Maven and currently targets Java 18.
+Source repository: `https://github.com/agtymc/org.agty.sql`
 
 ## Documentation
 
@@ -16,17 +17,26 @@ The project is built with Maven and currently targets Java 18.
 
 ## Maven Dependency From GitHub Repository
 
-Replace the repository URL below with the GitHub Maven repository URL when it
-is available.
+This project is configured for GitHub Packages:
+
+- Repository: `https://github.com/agtymc/org.agty.sql`
+- Maven registry: `https://maven.pkg.github.com/agtymc/org.agty.sql`
+- Maven server id: `org.agty.sql`
+
+Add the GitHub Packages repository:
 
 ```xml
 <repositories>
     <repository>
-        <id>github-org-agty-sql</id>
-        <url>GITHUB_MAVEN_REPOSITORY_URL</url>
+        <id>org.agty.sql</id>
+        <url>https://maven.pkg.github.com/agtymc/org.agty.sql</url>
     </repository>
 </repositories>
+```
 
+Then add the dependency:
+
+```xml
 <dependencies>
     <dependency>
         <groupId>org.agty</groupId>
@@ -34,6 +44,20 @@ is available.
         <version>2.0.0</version>
     </dependency>
 </dependencies>
+```
+
+Authentication for GitHub Packages is usually required. In `~/.m2/settings.xml`:
+
+```xml
+<settings>
+    <servers>
+        <server>
+            <id>org.agty.sql</id>
+            <username>YOUR_GITHUB_LOGIN</username>
+            <password>YOUR_GITHUB_TOKEN</password>
+        </server>
+    </servers>
+</settings>
 ```
 
 ## Using A Local JAR
@@ -63,3 +87,7 @@ Then use the regular Maven dependency:
 
 2. Keep the JAR in your application and add it manually to the classpath if
 your build flow does not use Maven artifact installation.
+
+## License
+
+Apache License 2.0. See `LICENSE`.

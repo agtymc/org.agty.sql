@@ -343,7 +343,9 @@ public class RowData extends LinkedHashMap<String, Object> implements SqlRow {
         return switch (normalizedValue) {
             case "true", "t", "y", "yes", "on", "1" -> true;
             case "false", "f", "n", "no", "off", "0" -> false;
-            default -> null;
+            default -> throw new IllegalArgumentException(
+                    "Unsupported boolean value for key '" + key + "': " + rawValue
+            );
         };
     }
 
