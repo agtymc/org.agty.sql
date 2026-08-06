@@ -1,0 +1,89 @@
+# Keep the structure synchronized with config.ini and do not store real secrets here.
+
+#Соединение с БД
+db.default.driver = mysql
+db.default.server = localhost
+db.default.port = 23307
+db.default.user = agty_sql
+db.default.password = <change-me>
+db.default.database = agty_sql
+db.default.pfx = agty_
+db.default.encoding = UTF-8
+db.default.serverTimeZone = UTC
+db.default.logquery = false
+db.default.debug = true
+
+#Соединение с БД
+db.mysql.driver = mysql
+db.mysql.server = localhost
+db.mysql.port = 23307
+db.mysql.user = agty_sql
+db.mysql.password = <change-me>
+db.mysql.database = agty_sql
+db.mysql.pfx = agty_
+db.mysql.encoding = UTF-8
+db.mysql.serverTimeZone = UTC
+db.mysql.logquery = false
+db.mysql.debug = true
+
+db.mariadb.driver = mariadb
+db.mariadb.server = localhost
+db.mariadb.port = 23316
+db.mariadb.user = agty_sql
+db.mariadb.password = <change-me>
+db.mariadb.database = agty_sql
+db.mariadb.pfx = agty_
+db.mariadb.encoding = UTF-8
+db.mariadb.serverTimeZone = UTC
+db.mariadb.logquery = false
+db.mariadb.debug = true
+
+db.sqlite.driver = sqlite
+db.sqlite.server = localhost
+db.sqlite.port = 0
+db.sqlite.user =
+db.sqlite.password =
+db.sqlite.database = databases/sqlite/agty_sql.sqlite
+db.sqlite.pfx = agty_
+db.sqlite.encoding = UTF-8
+db.sqlite.serverTimeZone = UTC
+db.sqlite.logquery = false
+db.sqlite.debug = true
+
+db.h2.driver = h2
+db.h2.server = localhost
+db.h2.port = 0
+db.h2.user = sa
+db.h2.password =
+db.h2.database = databases/h2/agty_sql
+db.h2.schema = PUBLIC
+db.h2.pfx = agty_
+db.h2.encoding = UTF-8
+db.h2.serverTimeZone = UTC
+db.h2.logquery = false
+db.h2.debug = true
+
+db.pgsql.driver = pgsql
+db.pgsql.server = localhost
+db.pgsql.port = 25432
+db.pgsql.user = agty_sql
+db.pgsql.password = <change-me>
+db.pgsql.database = agty_sql
+db.pgsql.schema = public
+db.pgsql.pfx = agty_
+db.pgsql.encoding = UTF-8
+db.pgsql.serverTimeZone = UTC
+db.pgsql.logquery = false
+db.pgsql.debug = true
+
+db.mongodb.driver = mongodb
+db.mongodb.server = localhost
+db.mongodb.port = 27018
+db.mongodb.user = agty_sql
+db.mongodb.password = <change-me>
+db.mongodb.database = agty_sql
+db.mongodb.pfx = agty_
+db.mongodb.encoding = UTF-8
+db.mongodb.serverTimeZone = UTC
+db.mongodb.logquery = false
+db.mongodb.debug = true

@@ -1,0 +1,28 @@
+# OS and editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+*.swp
+*.swo
+
+# Java and Maven
+target/
+out/
+*.class
+*.jar
+*.war
+*.ear
+dependency-reduced-pom.xml
+
+# Local runtime data
+logs/
+databases/
+config.ini
+\!files/
+
+# Local project instructions
+AGENTS.md
