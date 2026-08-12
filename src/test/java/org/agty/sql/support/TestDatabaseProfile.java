@@ -18,6 +18,13 @@ public record TestDatabaseProfile(
         return sql;
     }
 
+    public String sqlBooleanLiteral(boolean value) {
+        if ("mssql".equalsIgnoreCase(server)) {
+            return value ? "1" : "0";
+        }
+        return value ? "true" : "false";
+    }
+
     @Override
     public String toString() {
         return server;

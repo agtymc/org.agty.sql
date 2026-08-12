@@ -85,8 +85,8 @@ class AgtySQLJdbcAccessIntegrationTest {
             recreateTable(sql, profile, table);
 
             int[] result = sql.executeBatch(List.of(
-                    "INSERT INTO " + table + " (id, string, integers, bool) VALUES (201, 'batch-1', 11, true)",
-                    "INSERT INTO " + table + " (id, string, integers, bool) VALUES (202, 'batch-2', 22, false)"
+                    "INSERT INTO " + table + " (id, string, integers, bool) VALUES (201, 'batch-1', 11, " + profile.sqlBooleanLiteral(true) + ")",
+                    "INSERT INTO " + table + " (id, string, integers, bool) VALUES (202, 'batch-2', 22, " + profile.sqlBooleanLiteral(false) + ")"
             ));
 
             Assertions.assertEquals(2, result.length);
