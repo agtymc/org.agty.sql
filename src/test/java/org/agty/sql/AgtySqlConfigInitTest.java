@@ -42,6 +42,18 @@ class AgtySqlConfigInitTest {
     }
 
     @Test
+    void loadsMssqlSectionFromDefaultConfig() {
+        AgtySqlConfig config = new AgtySqlConfigInit("mssql").getConfig();
+
+        assertEquals("mssql", config.getDriver());
+        assertEquals("localhost", config.getServer());
+        assertEquals(21433, config.getPort());
+        assertEquals("sa", config.getUser());
+        assertEquals("agty_sql", config.getDatabase());
+        assertEquals("dbo", config.getSchema());
+    }
+
+    @Test
     void loadsFileDatabaseSectionsFromDefaultConfig() {
         AgtySqlConfig sqlite = new AgtySqlConfigInit("sqlite").getConfig();
         AgtySqlConfig h2 = new AgtySqlConfigInit("h2").getConfig();

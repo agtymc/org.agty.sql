@@ -4,6 +4,7 @@ import org.agty.sql.AgtySQL;
 import org.agty.sql.dialect.emptysql.EmptySQL;
 import org.agty.sql.dialect.h2.H2;
 import org.agty.sql.dialect.mariadb.MariaDB;
+import org.agty.sql.dialect.mssql.MsSQL;
 import org.agty.sql.dialect.mysql.MySQL;
 import org.agty.sql.dialect.pgsql.PgSQL;
 import org.agty.sql.dialect.sqlite.SQLite;
@@ -36,7 +37,7 @@ public final class DialectDriverRegistry {
                 return new H2(agtySQL);
             }
             case "mssql" -> {
-                // return new MsSQL(agtySQL);
+                return new MsSQL(agtySQL);
             }
             case "emptysql" -> {
                 return new EmptySQL(agtySQL);

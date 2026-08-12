@@ -76,6 +76,19 @@ db.pgsql.serverTimeZone = UTC
 db.pgsql.logquery = false
 db.pgsql.debug = true
 
+db.mssql.driver = mssql
+db.mssql.server = localhost
+db.mssql.port = 21433
+db.mssql.user = sa
+db.mssql.password = AgtySqlMssqlPass_2026!
+db.mssql.database = agty_sql
+db.mssql.schema = dbo
+db.mssql.pfx = agty_
+db.mssql.encoding = UTF-8
+db.mssql.serverTimeZone = UTC
+db.mssql.logquery = false
+db.mssql.debug = true
+
 db.mongodb.driver = mongodb
 db.mongodb.server = localhost
 db.mongodb.port = 27018

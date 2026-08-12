@@ -7,6 +7,26 @@ entity/model mapping.
 The project is built with Maven and currently targets Java 18.
 Source repository: `https://github.com/agtymc/org.agty.sql`
 
+## Supported Drivers
+
+Current SQL driver support in `2.0.2`:
+
+- MySQL
+- MariaDB
+- PostgreSQL
+- MSSQL (SQL Server)
+- SQLite
+- H2
+
+Driver notes:
+
+- MySQL, MariaDB, SQLite, and H2 use documented follow-up fetch strategies for
+  some write-return flows.
+- PostgreSQL and MSSQL provide native row-return support for
+  `insertAndGet()` / `updateAndGet()`.
+- SQLite and H2 are file-based development-friendly options.
+- MSSQL local development can be started with `install/install-mssql.sh`.
+
 ## Documentation
 
 - English guide: `docs/en/USER_GUIDE.md`
@@ -41,7 +61,7 @@ Then add the dependency:
     <dependency>
         <groupId>org.agty</groupId>
         <artifactId>org-agty-sql</artifactId>
-        <version>2.0.1</version>
+        <version>2.0.2</version>
     </dependency>
 </dependencies>
 ```
@@ -68,10 +88,10 @@ When the JAR is packaged, add it to your project in one of these ways:
 
 ```bash
 mvn install:install-file \
-  -Dfile=path/to/org-agty-sql-2.0.1.jar \
+  -Dfile=path/to/org-agty-sql-2.0.2.jar \
   -DgroupId=org.agty \
   -DartifactId=org-agty-sql \
-  -Dversion=2.0.1 \
+  -Dversion=2.0.2 \
   -Dpackaging=jar
 ```
 
@@ -81,7 +101,7 @@ Then use the regular Maven dependency:
 <dependency>
     <groupId>org.agty</groupId>
     <artifactId>org-agty-sql</artifactId>
-    <version>2.0.1</version>
+    <version>2.0.2</version>
 </dependency>
 ```
 

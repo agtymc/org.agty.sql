@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+## 2.0.2 - 2026-08-12
+
+### Added
+- Initial MSSQL (`mssql`) dialect support with SQL Server JDBC integration.
+- Native `insertAndGet()` / `updateAndGet()` support for MSSQL via `OUTPUT inserted`.
+- Development install script `install/install-mssql.sh` for a local SQL Server Docker container.
+
+### Changed
+- README files now list the full supported SQL driver matrix: MySQL, MariaDB, PostgreSQL, MSSQL, SQLite, and H2.
+- Sample and local config files now include an `mssql` connection profile for SQL Server development and integration runs.
+
+### Testing
+- MSSQL was added to the live cross-database integration matrix and validated against the current capability and CRUD integration tests.
+
 ## 2.0.1 - 2026-08-06
 
 ### Changed

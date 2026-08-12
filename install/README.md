@@ -5,6 +5,7 @@ Scripts in this directory install or start local Docker containers for developme
 - `install-mysql.sh` creates or starts `agty-sql-mysql`
 - `install-mariadb.sh` creates or starts `agty-sql-mariadb`
 - `install-pgsql.sh` creates or starts `agty-sql-pgsql`
+- `install-mssql.sh` creates or starts `agty-sql-mssql`
 - `install-mongodb.sh` creates or starts `agty-sql-mongodb`
 
 The scripts use named Docker volumes for server databases.

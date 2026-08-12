@@ -7,6 +7,26 @@ entity/model-слоем.
 Проект собирается через Maven и сейчас ориентирован на Java 18.
 Исходный репозиторий: `https://github.com/agtymc/org.agty.sql`
 
+## Поддерживаемые Драйверы
+
+Актуальная поддержка SQL-драйверов в `2.0.2`:
+
+- MySQL
+- MariaDB
+- PostgreSQL
+- MSSQL (SQL Server)
+- SQLite
+- H2
+
+Замечания по драйверам:
+
+- MySQL, MariaDB, SQLite и H2 используют documented follow-up fetch стратегии
+  для части write-return сценариев.
+- PostgreSQL и MSSQL поддерживают native row-return для
+  `insertAndGet()` / `updateAndGet()`.
+- SQLite и H2 подходят как file-based варианты для локальной разработки.
+- Для локального MSSQL теперь есть `install/install-mssql.sh`.
+
 ## Документация
 
 - Английское руководство: `docs/en/USER_GUIDE.md`
@@ -41,7 +61,7 @@ entity/model-слоем.
     <dependency>
         <groupId>org.agty</groupId>
         <artifactId>org-agty-sql</artifactId>
-        <version>2.0.1</version>
+        <version>2.0.2</version>
     </dependency>
 </dependencies>
 ```
@@ -68,10 +88,10 @@ entity/model-слоем.
 
 ```bash
 mvn install:install-file \
-  -Dfile=path/to/org-agty-sql-2.0.1.jar \
+  -Dfile=path/to/org-agty-sql-2.0.2.jar \
   -DgroupId=org.agty \
   -DartifactId=org-agty-sql \
-  -Dversion=2.0.1 \
+  -Dversion=2.0.2 \
   -Dpackaging=jar
 ```
 
@@ -81,7 +101,7 @@ mvn install:install-file \
 <dependency>
     <groupId>org.agty</groupId>
     <artifactId>org-agty-sql</artifactId>
-    <version>2.0.1</version>
+    <version>2.0.2</version>
 </dependency>
 ```
 

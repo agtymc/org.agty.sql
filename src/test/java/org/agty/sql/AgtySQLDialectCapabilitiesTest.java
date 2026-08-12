@@ -59,8 +59,32 @@ class AgtySQLDialectCapabilitiesTest {
                 "org.agty.sql.dialect.pgsql.PgSQL",
                 DialectDriverRegistry.getDialect("pgsql", null).getClass().getName()
         );
+        Assertions.assertEquals(
+                "org.agty.sql.dialect.mssql.MsSQL",
+                DialectDriverRegistry.getDialect("mssql", null).getClass().getName()
+        );
         Assertions.assertEquals("mysql", DialectDriverRegistry.getDriverName("mysql"));
         Assertions.assertEquals("postgresql", DialectDriverRegistry.getDriverName("pgsql"));
+        Assertions.assertEquals("sqlserver", DialectDriverRegistry.getDriverName("mssql"));
+    }
+
+    @Test
+    void mssqlDialectExposesNativeReturningCapabilities() {
+        DialectCapabilities capabilities = DialectDriverRegistry.getDialect("mssql", null).getCapabilities();
+
+        Assertions.assertEquals(
+                DialectCapabilities.of(
+                        false,
+                        true,
+                        LastInsertIdStrategy.CONNECTION_FUNCTION,
+                        WriteReturnStrategy.NATIVE_RETURNING,
+                        UpdateAndGetStrategy.NATIVE_RETURNING
+                ),
+                capabilities
+        );
+        Assertions.assertTrue(capabilities.supportsInsertAndGetReturning());
+        Assertions.assertTrue(capabilities.supportsUpdateAndGetReturning());
+        Assertions.assertTrue(capabilities.supportsLastInsertId());
     }
 
     @Test

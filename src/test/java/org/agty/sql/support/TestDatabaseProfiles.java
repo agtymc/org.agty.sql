@@ -90,6 +90,31 @@ public final class TestDatabaseProfiles {
                         )
                 ),
                 new TestDatabaseProfile(
+                        "mssql",
+                        "{integration_smoke_mssql}",
+                        """
+                        CREATE TABLE {table} (
+                            id BIGINT PRIMARY KEY,
+                            string VARCHAR(255),
+                            integers INT,
+                            bool BIT
+                        )
+                        """,
+                        """
+                        CREATE TABLE {table} (
+                            id BIGINT IDENTITY(1,1) PRIMARY KEY,
+                            string VARCHAR(255)
+                        )
+                        """,
+                        DialectCapabilities.of(
+                                false,
+                                true,
+                                LastInsertIdStrategy.CONNECTION_FUNCTION,
+                                WriteReturnStrategy.NATIVE_RETURNING,
+                                UpdateAndGetStrategy.NATIVE_RETURNING
+                        )
+                ),
+                new TestDatabaseProfile(
                         "sqlite",
                         "{integration_smoke_sqlite}",
                         """

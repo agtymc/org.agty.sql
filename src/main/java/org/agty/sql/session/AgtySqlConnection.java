@@ -55,6 +55,10 @@ public class AgtySqlConnection {
             return getH2ConnectionUri();
         }
 
+        if (isSqlServerDriver()) {
+            return getSqlServerConnectionUri();
+        }
+
         StringBuilder connectURI = new StringBuilder();
 
         connectURI.append("jdbc:");
@@ -95,12 +99,41 @@ public class AgtySqlConnection {
         return "h2".equalsIgnoreCase(getDriver());
     }
 
+    private boolean isSqlServerDriver() {
+        return "sqlserver".equalsIgnoreCase(getDriver());
+    }
+
     private String getSqliteConnectionUri() {
         return "jdbc:sqlite:" + normalizeDatabasePath();
     }
 
     private String getH2ConnectionUri() {
         return "jdbc:h2:file:" + normalizeDatabasePath() + ";MODE=MySQL";
+    }
+
+    private String getSqlServerConnectionUri() {
+        StringBuilder connectURI = new StringBuilder();
+
+        connectURI.append("jdbc:sqlserver://");
+        connectURI.append(getConfig().getServer());
+
+        if (getConfig().getPort() > 0) {
+            connectURI.append(':');
+            connectURI.append(getConfig().getPort());
+        }
+
+        connectURI.append(";");
+
+        if (getConfig().isDatabase()) {
+            connectURI.append("databaseName=");
+            connectURI.append(getConfig().getDatabase());
+            connectURI.append(";");
+        }
+
+        connectURI.append("encrypt=true;");
+        connectURI.append("trustServerCertificate=true;");
+
+        return connectURI.toString();
     }
 
     private String normalizeDatabasePath() {
