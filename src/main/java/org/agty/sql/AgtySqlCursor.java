@@ -16,6 +16,8 @@ public final class AgtySqlCursor implements AutoCloseable {
 
     private final ResultSet resultSet;
     private final Arguments arguments;
+    private SqlRow bufferedRow;
+    private boolean nextRowBuffered;
     private boolean closed;
 
     public AgtySqlCursor(ResultSet resultSet, Arguments arguments) {
@@ -35,11 +37,40 @@ public final class AgtySqlCursor implements AutoCloseable {
         return closed;
     }
 
+    public boolean hasNext() {
+        if (closed || resultSet == null) {
+            return false;
+        }
+
+        if (nextRowBuffered) {
+            return true;
+        }
+
+        bufferedRow = readNextRow();
+        if (bufferedRow == null) {
+            return false;
+        }
+
+        nextRowBuffered = true;
+        return true;
+    }
+
     public SqlRow next() {
         if (closed || resultSet == null) {
             return null;
         }
 
+        if (nextRowBuffered) {
+            SqlRow row = bufferedRow;
+            bufferedRow = null;
+            nextRowBuffered = false;
+            return row;
+        }
+
+        return readNextRow();
+    }
+
+    private SqlRow readNextRow() {
         try {
             if (!resultSet.next()) {
                 close();

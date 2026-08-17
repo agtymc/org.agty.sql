@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Added
+- `AgtySqlCursor.hasNext()` as an additional forward-only iteration pattern for `openCursor(...)`, alongside the existing `next() != null` loop style.
+
+### Documentation
+- Cursor documentation now shows both supported `AgtySqlCursor` iteration styles so downstream ports can keep the public API behavior aligned.
+
 ## 2.0.2 - 2026-08-12
 
 ### Added

@@ -234,6 +234,18 @@ try (AgtySqlCursor cursor = sql.openCursor(
 }
 ```
 
+Итерация через `hasNext()` тоже поддерживается:
+
+```java
+try (AgtySqlCursor cursor = sql.openCursor(
+        "SELECT * FROM {users} ORDER BY id"
+)) {
+    while (cursor.hasNext()) {
+        long id = cursor.next().getLong("id");
+    }
+}
+```
+
 Плюсы:
 - forward-only API поверх JDBC;
 - возвращает `SqlRow`;

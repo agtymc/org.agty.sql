@@ -8,6 +8,8 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.stream.Stream;
 
 class AgtySQLCursorIntegrationTest {
@@ -89,6 +91,41 @@ class AgtySQLCursorIntegrationTest {
                 Assertions.assertEquals(3L, third.getLong("id"));
                 Assertions.assertEquals(4L, fourth.getLong("id"));
                 Assertions.assertNull(end);
+                Assertions.assertTrue(cursor.isClosed());
+            }
+        } finally {
+            dropTableQuietly(sql, table);
+            sql.close();
+        }
+    }
+
+    @ParameterizedTest(name = "public cursor hasNext api: {0}")
+    @MethodSource("sqlProfiles")
+    void streamsRowsThroughPublicCursorHasNext(TestDatabaseProfile profile) {
+        AgtySQL sql = profile.createSql();
+        String table = "{integration_public_cursor_hasnext_" + profile.server() + "}";
+
+        try {
+            recreateTable(sql, profile, table);
+            insertRows(sql, table);
+
+            try (AgtySqlCursor cursor = sql.openCursor(
+                    Arguments.builder()
+                            .setTable(table)
+                            .setOrderBy("id ASC")
+            )) {
+                List<Long> ids = new ArrayList<>();
+
+                Assertions.assertTrue(cursor.hasNext());
+                Assertions.assertTrue(cursor.hasNext());
+
+                while (cursor.hasNext()) {
+                    ids.add(cursor.next().getLong("id"));
+                }
+
+                Assertions.assertEquals(List.of(1L, 2L, 3L, 4L), ids);
+                Assertions.assertFalse(cursor.hasNext());
+                Assertions.assertNull(cursor.next());
                 Assertions.assertTrue(cursor.isClosed());
             }
         } finally {

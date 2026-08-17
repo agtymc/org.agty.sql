@@ -175,6 +175,18 @@ try (AgtySqlCursor cursor = sql.openCursor(
 }
 ```
 
+`hasNext()` iteration is also supported:
+
+```java
+try (AgtySqlCursor cursor = sql.openCursor(
+        "SELECT * FROM {users} ORDER BY id"
+)) {
+    while (cursor.hasNext()) {
+        long id = cursor.next().getLong("id");
+    }
+}
+```
+
 ## Ownership and lifecycle
 
 ### High-level methods

@@ -56,10 +56,23 @@ try (AgtySqlCursor cursor = sql.openCursor(
 }
 ```
 
+An iterative `hasNext()` style is also supported:
+
+```java
+try (AgtySqlCursor cursor = sql.openCursor(
+        "SELECT * FROM {users} ORDER BY id"
+)) {
+    while (cursor.hasNext()) {
+        System.out.println(cursor.next().getLong("id"));
+    }
+}
+```
+
 Properties of `AgtySqlCursor`:
 
 - forward-only reading;
 - returns `SqlRow`;
+- supports both `while ((row = cursor.next()) != null)` and `while (cursor.hasNext()) { cursor.next(); }` patterns;
 - closes automatically at the end of the result set;
 - safe for `try-with-resources`.
 
