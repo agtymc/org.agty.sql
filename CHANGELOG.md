@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 2.0.3 - 2026-08-17
 
 ### Added
 - `AgtySqlCursor.hasNext()` as an additional forward-only iteration pattern for `openCursor(...)`, alongside the existing `next() != null` loop style.
