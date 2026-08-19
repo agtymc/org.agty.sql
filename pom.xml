@@ -6,7 +6,7 @@
 
     <groupId>org.agty</groupId>
     <artifactId>org-agty-sql</artifactId>
-    <version>2.0.3</version>
+    <version>2.0.4</version>
     <name>org.agty.sql</name>
     <description>Lightweight Java SQL library with a high-level API, JDBC access, and cursor-style reading.</description>
     <url>https://github.com/agtymc/org.agty.sql</url>

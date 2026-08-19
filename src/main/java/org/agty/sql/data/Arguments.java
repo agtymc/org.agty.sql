@@ -647,6 +647,19 @@ public class Arguments {
         return this;
     }
 
+    /**
+     * Добавить boolean-значение в формате, подходящем для выбранного драйвера.
+     *
+     * @param field имя поля.
+     * @param value boolean-значение.
+     * @param driver имя драйвера.
+     * @return текущий объект Arguments.
+     */
+    public Arguments addData(String field, boolean value, String driver) {
+        dataPut(field, Arguments.getBooleanValueForDriver(value, driver));
+        return this;
+    }
+
     public Arguments addData(String field, Float value) {
         dataPut(field, value);
         return this;
@@ -728,6 +741,30 @@ public class Arguments {
 
     private void dataPut(String field, Object value) {
         data.put(field, value);
+    }
+
+    /**
+     * Возвращает boolean-значение в формате записи, ожидаемом драйвером БД.
+     *
+     * <p>Для `mysql`, `mariadb`, `mssql`, `sqlite` и `h2` возвращаются `1`/`0`.
+     * Для `pgsql` и `postgresql` возвращаются `true`/`false`.</p>
+     *
+     * @param value boolean-значение.
+     * @param driver имя драйвера.
+     * @return объект для записи в boolean-поле.
+     */
+    public static Object getBooleanValueForDriver(boolean value, String driver) {
+        if (driver == null || driver.isBlank()) {
+            throw new IllegalArgumentException("Driver name is required for boolean value conversion.");
+        }
+
+        return switch (driver.trim().toLowerCase(Locale.ROOT)) {
+            case "mysql", "mariadb", "mssql", "sqlserver", "sqlite", "h2" -> value ? 1 : 0;
+            case "pgsql", "postgres", "postgresql" -> value;
+            default -> throw new IllegalArgumentException(
+                    "Unsupported driver for boolean value conversion: " + driver
+            );
+        };
     }
 
     /**

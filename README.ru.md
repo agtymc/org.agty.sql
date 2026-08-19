@@ -9,7 +9,7 @@ entity/model-слоем.
 
 ## Поддерживаемые Драйверы
 
-Актуальная поддержка SQL-драйверов в `2.0.3`:
+Актуальная поддержка SQL-драйверов в `2.0.4`:
 
 - MySQL
 - MariaDB
@@ -61,7 +61,7 @@ entity/model-слоем.
     <dependency>
         <groupId>org.agty</groupId>
         <artifactId>org-agty-sql</artifactId>
-        <version>2.0.3</version>
+        <version>2.0.4</version>
     </dependency>
 </dependencies>
 ```
@@ -88,10 +88,10 @@ entity/model-слоем.
 
 ```bash
 mvn install:install-file \
-  -Dfile=path/to/org-agty-sql-2.0.3.jar \
+  -Dfile=path/to/org-agty-sql-2.0.4.jar \
   -DgroupId=org.agty \
   -DartifactId=org-agty-sql \
-  -Dversion=2.0.3 \
+  -Dversion=2.0.4 \
   -Dpackaging=jar
 ```
 
@@ -101,7 +101,7 @@ mvn install:install-file \
 <dependency>
     <groupId>org.agty</groupId>
     <artifactId>org-agty-sql</artifactId>
-    <version>2.0.3</version>
+    <version>2.0.4</version>
 </dependency>
 ```
 

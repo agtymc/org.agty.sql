@@ -49,4 +49,39 @@ class ArgumentsTest {
         assertTrue(arguments.forceRebuildQuery());
         assertTrue(arguments.returnLastInsertId());
     }
+
+    @Test
+    void convertsBooleanValuesByDriver() {
+        Arguments arguments = Arguments.builder();
+
+        assertEquals(1, arguments.getBooleanValueForDriver(true, "mysql"));
+        assertEquals(0, arguments.getBooleanValueForDriver(false, "mariadb"));
+        assertEquals(1, arguments.getBooleanValueForDriver(true, "mssql"));
+        assertEquals(0, arguments.getBooleanValueForDriver(false, "sqlite"));
+        assertEquals(1, arguments.getBooleanValueForDriver(true, "h2"));
+        assertEquals(true, arguments.getBooleanValueForDriver(true, "pgsql"));
+        assertEquals(false, arguments.getBooleanValueForDriver(false, "postgresql"));
+    }
+
+    @Test
+    void storesDriverAwareBooleanData() {
+        Arguments arguments = Arguments.builder()
+                .addData("mysql_flag", true, "mysql")
+                .addData("pgsql_flag", false, "pgsql");
+
+        assertEquals(1, arguments.getData("mysql_flag"));
+        assertEquals(false, arguments.getData("pgsql_flag"));
+    }
+
+    @Test
+    void rejectsUnknownDriverForBooleanConversion() {
+        Arguments arguments = Arguments.builder();
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> arguments.getBooleanValueForDriver(true, "oracle")
+        );
+
+        assertTrue(exception.getMessage().contains("Unsupported driver"));
+    }
 }

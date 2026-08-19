@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.0.4 - 2026-08-19
+
+### Added
+- `Arguments.getBooleanValueForDriver(boolean, String)` for driver-aware boolean payload conversion, plus `Arguments.addData(String, boolean, String)` for storing those values directly in query data.
+
 ## 2.0.3 - 2026-08-17
 
 ### Added
