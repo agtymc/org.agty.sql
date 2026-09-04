@@ -1,13 +1,15 @@
 package org.agty.sql.model.builders;
 
 import org.agty.sql.data.Arguments;
+import org.agty.sql.data.SqlExpression;
 import org.agty.sql.model.ModelAttributes;
 import org.agty.sql.model.SaveModelMode;
 import org.agty.sql.model.entity.ColumnEntity;
+import org.agty.sql.support.SqlIdentifierValidator;
 
 public class ModelArgumentsBuilder {
     private ModelAttributes<?> model;
-    private final Arguments arguments = Arguments.builder();
+    private final Arguments arguments = Arguments.builder().useStatementPrepare(true);
     private SaveModelMode saveModelMode;
     private ColumnEntity idColumn;
 
@@ -34,7 +36,9 @@ public class ModelArgumentsBuilder {
         arguments.setTable(model.getModel().getTableName());
 
         if (model.getModel().getAttributesBuilder().hasWhereCondition()) {
-            arguments.setWhere(model.getModel().getAttributesBuilder().getWhereCondition());
+            arguments.setWhere(SqlExpression.trusted(
+                    model.getModel().getAttributesBuilder().getWhereCondition()
+            ));
         }
 
         for (ColumnEntity column : model.getModel().getColumnsBuilder().getColumns()) {
@@ -55,10 +59,13 @@ public class ModelArgumentsBuilder {
                 }
 
                 if (!arguments.hasWhere()) {
-                    arguments.setWhere(
-                            column.valueIsDigit() && !column.columnIsString() ? "[%s] = %d" : "[%s] = '%s'",
+                    String columnName = SqlIdentifierValidator.requireColumn(
                             column.getColumn(),
-                            column.valueIsDigit() && !column.columnIsString() ? column.getValue() : column.getStringValue()
+                            "model ID field"
+                    );
+                    arguments.setWhere(
+                            "[%s] = ?".formatted(columnName),
+                            column.getValue()
                     );
                 }
 

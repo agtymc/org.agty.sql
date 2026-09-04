@@ -1,73 +1,67 @@
 package org.agty.sql.pool;
 
+import com.zaxxer.hikari.HikariConfig;
+import com.zaxxer.hikari.HikariDataSource;
 import org.agty.sql.AgtySQL;
 import org.agty.sql.config.AgtySqlConfig;
+import org.agty.sql.connect.AgtySqlConnector;
+import org.agty.sql.datasource.AgtySqlDataSource;
 
+import java.sql.Connection;
 import java.sql.SQLException;
 import java.time.Duration;
-import java.time.Instant;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
+/**
+ * Compatibility adapter exposing pooled {@link AgtySQL} sessions backed by HikariCP.
+ *
+ * <p>The pool is thread-safe. Each borrowed {@link PooledAgtySQL} handle is
+ * stateful, is not thread-safe, and must be closed by its borrower.</p>
+ */
 public final class AgtySQLPool implements AutoCloseable {
-
-    /* =====================================
-       CPU-aware ring buffers
-       ===================================== */
-
-    private static final int CPU = Runtime.getRuntime().availableProcessors();
-    private static final int RING_SIZE = 256;
-
-    private final Ring[] rings = new Ring[CPU];
-
-    private final ThreadLocal<Ring> threadRing;
-
-    /* ===================================== */
+    private static final AtomicLong POOL_SEQUENCE = new AtomicLong();
+    private static final long HIKARI_MIN_CONNECTION_TIMEOUT_MILLIS = 250L;
+    private static final long HIKARI_MIN_MAX_LIFETIME_MILLIS = 30_000L;
 
     private final AgtySqlConfig config;
     private final int maxPoolSize;
-    private final Duration maxLifetime;
     private final Duration defaultBorrowTimeout;
-
-    private final AtomicInteger totalConnections = new AtomicInteger();
+    private final HikariDataSource dataSource;
+    private final Semaphore permits;
+    private final Set<PooledAgtySQL> activeLeases = ConcurrentHashMap.newKeySet();
     private final AtomicBoolean closed = new AtomicBoolean(false);
-    private final Object borrowMonitor = new Object();
 
-    private final ScheduledExecutorService housekeeper;
-
-    /* ===================================== */
-
-    public AgtySQLPool(AgtySqlConfig config,
-                       int maxPoolSize,
-                       Duration maxLifetime,
-                       Duration defaultBorrowTimeout) {
-
-        this.config = config;
-        this.maxPoolSize = maxPoolSize;
-        this.maxLifetime = maxLifetime;
-        this.defaultBorrowTimeout = defaultBorrowTimeout;
-
-        for (int i = 0; i < rings.length; i++) {
-            rings[i] = new Ring();
+    public AgtySQLPool(
+            AgtySqlConfig config,
+            int maxPoolSize,
+            Duration maxLifetime,
+            Duration defaultBorrowTimeout
+    ) {
+        if (config == null) {
+            throw new IllegalArgumentException("AgtySqlConfig must not be null");
         }
+        if (maxPoolSize < 1) {
+            throw new IllegalArgumentException("maxPoolSize must be greater than zero");
+        }
+        requirePositive(maxLifetime, "maxLifetime");
+        requirePositive(defaultBorrowTimeout, "defaultBorrowTimeout");
 
-        threadRing = ThreadLocal.withInitial(() -> {
-
-            int id = (int) (Thread.currentThread().getId() % CPU);
-            return rings[id];
-
-        });
-
-        housekeeper = Executors.newSingleThreadScheduledExecutor(r -> {
-            Thread t = new Thread(r, "AgtySQLPool-Housekeeper");
-            t.setDaemon(true);
-            return t;
-        });
-
-        housekeeper.scheduleAtFixedRate(this::cleanExtended, 30, 30, TimeUnit.SECONDS);
+        this.config = AgtySqlConfig.getClone(config);
+        this.maxPoolSize = maxPoolSize;
+        this.defaultBorrowTimeout = defaultBorrowTimeout;
+        this.permits = new Semaphore(maxPoolSize, true);
+        this.dataSource = new HikariDataSource(createHikariConfig(maxLifetime));
     }
 
     public AgtySQLPool(AgtySqlConfig config, int maxPoolSize, Duration maxLifetime) {
@@ -82,323 +76,251 @@ public final class AgtySQLPool implements AutoCloseable {
         this(config, maxPoolSize, Duration.ofMinutes(durationMinutes));
     }
 
-    /* =====================================
-       ULTRA FAST BORROW
-       ===================================== */
-
     public PooledAgtySQL borrow() throws SQLException {
-
         return borrow(defaultBorrowTimeout);
     }
 
     public PooledAgtySQL borrow(Duration timeout) throws SQLException {
-
-        if (closed.get()) {
-            throw new IllegalStateException("Pool closed");
-        }
-
-        Duration effectiveTimeout = (timeout == null || timeout.isZero() || timeout.isNegative())
+        ensureOpen();
+        Duration effectiveTimeout = timeout == null || timeout.isZero() || timeout.isNegative()
                 ? Duration.ofMillis(1)
                 : timeout;
 
-        long deadline = System.nanoTime() + effectiveTimeout.toNanos();
+        boolean acquired;
+        try {
+            acquired = permits.tryAcquire(effectiveTimeout.toNanos(), TimeUnit.NANOSECONDS);
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new SQLException("Interrupted while waiting for a DB connection", exception);
+        }
+        if (!acquired) {
+            throw new SQLException("Connection timeout");
+        }
 
-        while (true) {
-            PooledAgtySQL conn = tryBorrowOnce();
-            if (conn != null) return conn;
+        if (closed.get()) {
+            permits.release();
+            throw new IllegalStateException("Pool closed");
+        }
 
-            long remainingNanos = deadline - System.nanoTime();
-            if (remainingNanos <= 0) {
-                throw new SQLException("Connection timeout");
+        Connection connection = null;
+        boolean registered = false;
+        try {
+            connection = dataSource.getConnection();
+            PooledAgtySQL lease = new PooledAgtySQL(
+                    new AgtySQL(new AgtySqlConnector(config, guard(connection))),
+                    this
+            );
+            activeLeases.add(lease);
+            registered = true;
+            if (closed.get()) {
+                lease.closeFromPool();
+                throw new IllegalStateException("Pool closed");
             }
-
-            synchronized (borrowMonitor) {
-                if (closed.get()) {
-                    throw new IllegalStateException("Pool closed");
+            return lease;
+        } catch (RuntimeException | SQLException exception) {
+            if (!registered) {
+                if (connection != null) {
+                    closeAfterFailedBorrow(connection, exception);
                 }
-                try {
-                    TimeUnit.NANOSECONDS.timedWait(borrowMonitor, remainingNanos);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    throw new SQLException("Interrupted while waiting for a DB connection", e);
-                }
+                permits.release();
             }
+            throw exception;
         }
     }
 
-    private PooledAgtySQL tryBorrowOnce() {
-        Ring ring = threadRing.get();
-        PooledAgtySQL conn = ring.poll();
-        if (conn != null && conn.tryBorrowFast()) {
-            return conn;
-        }
-
-        while (true) {
-            int cur = totalConnections.get();
-            if (cur >= maxPoolSize) break;
-            if (totalConnections.compareAndSet(cur, cur + 1)) {
-                try {
-                    return create();
-                } catch (RuntimeException e) {
-                    totalConnections.decrementAndGet();
-                    throw e;
-                }
-            }
-        }
-
-        for (Ring r : rings) {
-            conn = r.poll();
-            if (conn != null && conn.tryBorrowFast()) {
-                return conn;
-            }
-        }
-
-        return null;
-    }
-
-    /* =====================================
-       EXTENDED BORROW
-       ===================================== */
     public PooledAgtySQL borrowExtended(Duration timeout) throws SQLException {
-
-        Duration effectiveTimeout = (timeout == null || timeout.isZero() || timeout.isNegative())
-                ? defaultBorrowTimeout
-                : timeout;
-
-        long deadline = System.nanoTime() + effectiveTimeout.toNanos();
-
-        while (true) {
-            long remainingNanos = deadline - System.nanoTime();
-            if (remainingNanos <= 0) {
-                throw new SQLException("Extended timeout");
-            }
-
-            PooledAgtySQL c = borrow(Duration.ofNanos(remainingNanos));
-
-            if (c.isHealthyExtended()) {
-                return c;
-            }
-
-            c.destroy();
+        PooledAgtySQL lease = borrow(timeout == null ? defaultBorrowTimeout : timeout);
+        if (lease.isHealthy()) {
+            return lease;
         }
+        lease.close();
+        throw new SQLException("Borrowed connection is not healthy");
     }
 
-    /* =====================================
-       RELEASE
-       ===================================== */
-
-    void release(PooledAgtySQL conn) {
-
-        if (conn.destroyed) return;
-
-        conn.borrowed = false;
-
-        boolean offered = threadRing.get().offer(conn);
-        if (!offered) {
-            conn.destroy();
-            return;
-        }
-
-        synchronized (borrowMonitor) {
-            borrowMonitor.notify();
-        }
-    }
-
-    /* =====================================
-       CREATE
-       ===================================== */
-
-    private PooledAgtySQL create() {
-
-        AgtySQL sql = new AgtySQL(config);
-
-        return new PooledAgtySQL(sql, this);
-    }
-
-    /* =====================================
-       HOUSEKEEPER
-       ===================================== */
-
-    private void cleanExtended() {
-
-        Instant now = Instant.now();
-
-        for (Ring ring : rings) {
-            synchronized (ring) {
-                for (int i = 0; i < RING_SIZE; i++) {
-
-                    PooledAgtySQL c = ring.buffer[i];
-
-                    if (c == null) continue;
-
-                    if (Duration.between(c.createdAt, now).compareTo(maxLifetime) > 0) {
-                        c.destroy();
-                        ring.buffer[i] = null;
-                    }
-                }
-            }
-        }
-    }
-
-    /* =====================================
-       PRELOAD
-       ===================================== */
-
+    /** Creates and validates up to {@code count} physical connections eagerly. */
     public void preload(int count) {
-
-        for (int i = 0; i < count; i++) {
-
-            if (totalConnections.get() >= maxPoolSize) return;
-
-            totalConnections.incrementAndGet();
-
-            try {
-                PooledAgtySQL pooled = create();
-                boolean offered = threadRing.get().offer(pooled);
-                if (!offered) {
-                    pooled.destroy();
+        ensureOpen();
+        int target = Math.max(0, Math.min(count, maxPoolSize));
+        List<Connection> connections = new ArrayList<>(target);
+        try {
+            for (int index = 0; index < target; index++) {
+                connections.add(dataSource.getConnection());
+            }
+        } catch (SQLException exception) {
+            throw new IllegalStateException("Unable to preload DB connections", exception);
+        } finally {
+            for (Connection connection : connections) {
+                try {
+                    connection.close();
+                } catch (SQLException ignored) {
+                    // Hikari evicts a connection that cannot be returned cleanly.
                 }
-            } catch (RuntimeException e) {
-                totalConnections.decrementAndGet();
-                throw e;
             }
         }
     }
-
-    /* =====================================
-       CLOSE
-       ===================================== */
 
     @Override
     public void close() {
-
-        if (!closed.compareAndSet(false, true)) return;
-
-        synchronized (borrowMonitor) {
-            borrowMonitor.notifyAll();
+        if (!closed.compareAndSet(false, true)) {
+            return;
         }
+        for (PooledAgtySQL lease : List.copyOf(activeLeases)) {
+            lease.closeFromPool();
+        }
+        dataSource.close();
+    }
 
-        housekeeper.shutdownNow();
+    private HikariConfig createHikariConfig(Duration maxLifetime) {
+        HikariConfig hikari = new HikariConfig();
+        hikari.setPoolName("agty-sql-" + POOL_SEQUENCE.incrementAndGet());
+        hikari.setDataSource(new AgtySqlDataSource(config));
+        hikari.setMaximumPoolSize(maxPoolSize);
+        hikari.setMinimumIdle(0);
+        hikari.setAutoCommit(config.isAutoCommit());
+        if (config.isSchema() && !config.getSchema().isBlank()) {
+            hikari.setSchema(config.getSchema());
+        }
+        hikari.setConnectionTimeout(Math.max(
+                HIKARI_MIN_CONNECTION_TIMEOUT_MILLIS,
+                defaultBorrowTimeout.toMillis()
+        ));
+        hikari.setMaxLifetime(Math.max(
+                HIKARI_MIN_MAX_LIFETIME_MILLIS,
+                maxLifetime.toMillis()
+        ));
+        hikari.setInitializationFailTimeout(0);
+        return hikari;
+    }
 
-        for (Ring ring : rings) {
+    private void release(PooledAgtySQL lease) {
+        if (activeLeases.remove(lease)) {
+            permits.release();
+        }
+    }
 
-            for (int i = 0; i < RING_SIZE; i++) {
+    private static void closeAfterFailedBorrow(Connection connection, Exception failure) {
+        try {
+            connection.close();
+        } catch (SQLException closeException) {
+            failure.addSuppressed(closeException);
+        }
+    }
 
-                PooledAgtySQL c = ring.buffer[i];
+    private Connection guard(Connection connection) {
+        InvocationHandler handler = new InvocationHandler() {
+            private final AtomicBoolean closedHandle = new AtomicBoolean(false);
 
-                if (c != null) {
-                    c.destroy();
+            @Override
+            public Object invoke(Object proxyObject, Method method, Object[] args) throws Throwable {
+                String methodName = method.getName();
+                if ("close".equals(methodName)) {
+                    if (closedHandle.compareAndSet(false, true)) {
+                        connection.close();
+                    }
+                    return null;
+                }
+                if ("isClosed".equals(methodName)) {
+                    return closedHandle.get() || closed.get() || connection.isClosed();
+                }
+                if ("unwrap".equals(methodName)) {
+                    Class<?> target = unwrapTarget(args);
+                    if (target.isInstance(proxyObject)) {
+                        return proxyObject;
+                    }
+                    throw new SQLException("Unwrapping a pooled physical connection is disabled");
+                }
+                if ("isWrapperFor".equals(methodName)) {
+                    return unwrapTarget(args).isInstance(proxyObject);
+                }
+                if ("toString".equals(methodName)) {
+                    return "AgtySQLPoolConnection[guarded]";
+                }
+                if ("hashCode".equals(methodName)) {
+                    return System.identityHashCode(proxyObject);
+                }
+                if ("equals".equals(methodName)) {
+                    return proxyObject == (args == null ? null : args[0]);
+                }
+                if (closedHandle.get() || closed.get()) {
+                    throw new SQLException("Connection handle is closed");
+                }
+                try {
+                    return method.invoke(connection, args);
+                } catch (InvocationTargetException exception) {
+                    throw exception.getCause();
                 }
             }
+        };
+        return (Connection) Proxy.newProxyInstance(
+                Connection.class.getClassLoader(),
+                new Class<?>[]{Connection.class},
+                handler
+        );
+    }
+
+    private static Class<?> unwrapTarget(Object[] args) throws SQLException {
+        if (args == null || args.length != 1 || !(args[0] instanceof Class<?> target)) {
+            throw new SQLException("Invalid unwrap target");
+        }
+        return target;
+    }
+
+    private void ensureOpen() {
+        if (closed.get()) {
+            throw new IllegalStateException("Pool closed");
         }
     }
 
-    /* =====================================
-       RING BUFFER
-       ===================================== */
-
-    private static final class Ring {
-
-        final PooledAgtySQL[] buffer = new PooledAgtySQL[RING_SIZE];
-
-        int head;
-        int tail;
-
-        boolean offer(PooledAgtySQL c) {
-            synchronized (this) {
-                int next = (tail + 1) & (RING_SIZE - 1);
-
-                if (next == head) return false;
-
-                buffer[tail] = c;
-
-                tail = next;
-                return true;
-            }
-        }
-
-        PooledAgtySQL poll() {
-            synchronized (this) {
-                if (head == tail) return null;
-
-                PooledAgtySQL c = buffer[head];
-
-                buffer[head] = null;
-
-                head = (head + 1) & (RING_SIZE - 1);
-
-                return c;
-            }
+    private static void requirePositive(Duration value, String name) {
+        if (value == null || value.isZero() || value.isNegative()) {
+            throw new IllegalArgumentException(name + " must be positive");
         }
     }
-
-    /* =====================================
-       CONNECTION WRAPPER
-       ===================================== */
 
     public static final class PooledAgtySQL implements AutoCloseable {
+        private final AgtySQL delegate;
+        private final AgtySQLPool pool;
+        private final AtomicBoolean closed = new AtomicBoolean(false);
 
-        final AgtySQL delegate;
-        final AgtySQLPool pool;
-
-        final Instant createdAt = Instant.now();
-
-        volatile boolean borrowed = false;
-        volatile boolean destroyed = false;
-
-        PooledAgtySQL(AgtySQL delegate, AgtySQLPool pool) {
+        private PooledAgtySQL(AgtySQL delegate, AgtySQLPool pool) {
             this.delegate = delegate;
             this.pool = pool;
         }
 
-        boolean tryBorrowFast() {
-
-            if (destroyed) return false;
-            if (borrowed) return false;
-
-            borrowed = true;
-
-            return true;
+        public AgtySQL sql() {
+            if (closed.get() || pool.closed.get()) {
+                throw new IllegalStateException("Pooled AgtySQL handle is closed");
+            }
+            return delegate;
         }
 
-        boolean isHealthyExtended() {
-
+        private boolean isHealthy() {
             try {
-                return !delegate.getConnector().getConnection().isClosed();
-            }
-            catch (Exception e) {
+                Connection connection = delegate.getConnection();
+                return !connection.isClosed() && connection.isValid(2);
+            } catch (SQLException exception) {
                 return false;
             }
         }
 
-        public AgtySQL sql() {
-            return delegate;
-        }
-
         @Override
         public void close() {
-
-            if (destroyed) return;
-
-            delegate.clearErrors();
-
-            pool.release(this);
+            closeLease();
         }
 
-        void destroy() {
+        private void closeFromPool() {
+            closeLease();
+        }
 
-            if (destroyed) return;
-            destroyed = true;
-
-            pool.totalConnections.decrementAndGet();
-            synchronized (pool.borrowMonitor) {
-                pool.borrowMonitor.notifyAll();
+        private void closeLease() {
+            if (!closed.compareAndSet(false, true)) {
+                return;
             }
-
             try {
                 delegate.close();
+            } finally {
+                pool.release(this);
             }
-            catch (Exception ignore) {}
         }
     }
 }

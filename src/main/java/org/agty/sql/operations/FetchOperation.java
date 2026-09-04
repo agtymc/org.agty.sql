@@ -4,10 +4,12 @@ import org.agty.sql.AgtySqlOperationSupport;
 import org.agty.sql.data.Arguments;
 import org.agty.sql.interfaces.SqlRow;
 import org.agty.sql.model.ModelControl;
+import org.agty.sql.support.PreparedStatementSupport;
 import org.agty.sql.support.RowFactory;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 
 public final class FetchOperation {
 
@@ -22,24 +24,42 @@ public final class FetchOperation {
                 ? arguments.getQuery()
                 : support.getDriverSqlObject().fetchQuery(arguments);
 
+        return fetchQuery(query, arguments, "AgtySQL.fetch()");
+    }
+
+    private SqlRow fetchQuery(String query, Arguments arguments, String errorType) {
         if (support.hasQuery(query)) {
-            try (ResultSet resultSet = support.executeQuery(query, arguments.noRebuildQuery())) {
-                return support.getFetchRow(resultSet, arguments);
+            ResultSet resultSet = executeQuery(query, arguments);
+            try (Statement statement = resultSet == null ? null : resultSet.getStatement();
+                 ResultSet closeableResultSet = resultSet) {
+                return support.getFetchRow(closeableResultSet, arguments);
             } catch (SQLException e) {
-                support.throwError("AgtySQL.fetch()", e.getMessage());
+                support.throwError(errorType, e);
             }
         } else {
-            support.throwError("AgtySQL.fetch()", "No a query for FETCH");
+            support.throwError(errorType, "No a query for FETCH");
         }
 
         return RowFactory.emptyRow();
+    }
+
+    private ResultSet executeQuery(String query, Arguments arguments) {
+        if (!arguments.useStatementPrepare()) {
+            return support.executeQuery(query, arguments.noRebuildQuery());
+        }
+
+        return support.executePreparedQuery(
+                query,
+                PreparedStatementSupport.readParameters(arguments),
+                arguments.noRebuildQuery()
+        );
     }
 
     public <T> T fetchEntity(Arguments arguments, T object) {
         try {
             return ModelControl.newModelControl().fetchEntity(support.getAgtySQL(), arguments, object);
         } catch (Exception e) {
-            support.throwError("AgSQL.save()//[fetch(Arguments arguments, T object)]", e.getMessage());
+            support.throwError("AgSQL.save()//[fetch(Arguments arguments, T object)]", e);
         }
         return null;
     }
@@ -48,7 +68,7 @@ public final class FetchOperation {
         try {
             return ModelControl.newModelControl().fetchEntity(support.getAgtySQL(), arguments, clazz);
         } catch (Exception e) {
-            support.throwError("AgSQL.save()//[fetch(Arguments arguments, T object)]", e.getMessage());
+            support.throwError("AgSQL.save()//[fetch(Arguments arguments, T object)]", e);
         }
         return null;
     }
@@ -59,7 +79,7 @@ public final class FetchOperation {
                 : support.getDriverSqlObject().countRowsQuery(arguments);
 
         if (support.hasQuery(query)) {
-            SqlRow getData = fetch(new Arguments().setQuery(query));
+            SqlRow getData = fetchQuery(query, arguments, "AgtySQL.countRows()");
             return getData.getLong("rows");
         }
 
@@ -78,12 +98,12 @@ public final class FetchOperation {
     public SqlRow getLastRow(Arguments arguments) {
         String query = support.getDriverSqlObject().getLastRowQuery(arguments);
         support.debugMessage("AgtySQL.getLastRow()", "Query: " + query);
-        return fetch(new Arguments().setQuery(query));
+        return fetchQuery(query, arguments, "AgtySQL.getLastRow()");
     }
 
     public SqlRow getFirstRow(Arguments arguments) {
         String query = support.getDriverSqlObject().getFirstRowQuery(arguments);
         support.debugMessage("AgtySQL.getFirstRow()", "Query: " + query);
-        return fetch(new Arguments().setQuery(query));
+        return fetchQuery(query, arguments, "AgtySQL.getFirstRow()");
     }
 }

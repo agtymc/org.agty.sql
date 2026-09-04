@@ -2,17 +2,10 @@ package org.agty.sql.data;
 
 import org.agty.sql.support.DebugMessages;
 
-import java.util.HashMap;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
 /**
  * Rebuild a query
  */
 public class SqlQueryRebuild {
-    /** A content into quotes counter*/
-    private int contentQuoteCounter;
-
     /** Q query changed*/
     private boolean queryIsChanged = false;
 
@@ -44,7 +37,7 @@ public class SqlQueryRebuild {
      * @param query A query string
      */
     public SqlQueryRebuild(String query) {
-        setQuery(query);
+        this.query = query;
     }
 
     /**
@@ -177,27 +170,12 @@ public class SqlQueryRebuild {
      */
     public String rebuildAndGet() {
         debugMessageQuery("Original query");
+        if (query == null || query.isEmpty()) return query;
 
-        HashMap<Integer, String> collect = new HashMap<>();
-
-        //Замещаем все экранированные кавычки
-        replaceQuoteEscape();
-
-        //Находим все что между '
-        replaceQuoteContent('\'', collect);
-
-        //Находим все что между "
-        replaceQuoteContent('"', collect);
-
-        //Меняем все названия {таблиц} на названия таблиц с префиксом: `pfx_таблица`, "pfx_таблица"
-        tablePrefix();
-
-        //Меняем все названия [полей] на названия полей в кавычках: `поле`, "поле"
-        columnsQuote();
-
-        //Возвращаем строковые параметры в кавычках '/" на свои места, а так же возвращаем экранированные кавычки
-        restoreValueContent(collect);
-
+        String originalQuery = query;
+        query = rebuildOutsideProtectedSql(query);
+        setQueryIsChanged(!originalQuery.equals(query));
+        debugMessageQuery("Rebuilt query");
         return query;
     }
 
@@ -209,64 +187,168 @@ public class SqlQueryRebuild {
         if (isDebug()) DebugMessages.print("SqlQueryRebuild()", message + ": " + query);
     }
 
-    /**
-     * Replace quote escape
-     */
-    private void replaceQuoteEscape() {
-        if (!query.contains("\\'") && !query.contains("\\\"")) return;
-        query = query.replace("\\'", "$(singleQuote)").replace("\\\"", "$(doubleQuote)");
-        setQueryIsChanged(true);
-        debugMessageQuery("After replace quote escape");
+    private String rebuildOutsideProtectedSql(String source) {
+        StringBuilder result = new StringBuilder(source.length());
+
+        for (int index = 0; index < source.length();) {
+            char current = source.charAt(index);
+
+            if (current == '\'' || current == '"' || current == '`') {
+                index = appendQuoted(source, result, index, current);
+                continue;
+            }
+
+            if (current == '-' && hasNext(source, index, '-')) {
+                index = appendLineComment(source, result, index);
+                continue;
+            }
+
+            if (current == '/' && hasNext(source, index, '*')) {
+                index = appendBlockComment(source, result, index);
+                continue;
+            }
+
+            if (current == '$') {
+                int nextIndex = appendDollarQuoted(source, result, index);
+                if (nextIndex != index) {
+                    index = nextIndex;
+                    continue;
+                }
+            }
+
+            if (current == '{') {
+                int end = source.indexOf('}', index + 1);
+                if (end > index && isTableIdentifier(source, index + 1, end)) {
+                    result.append(quoteTable).append(prefix);
+                    result.append(source, index + 1, end);
+                    result.append(quoteTable);
+                    index = end + 1;
+                    continue;
+                }
+            }
+
+            if (current == '[') {
+                int end = source.indexOf(']', index + 1);
+                if (end > index && isColumnIdentifier(source, index + 1, end)) {
+                    result.append(quoteColumn);
+                    result.append(source, index + 1, end);
+                    result.append(quoteColumn);
+                    index = end + 1;
+                    continue;
+                }
+            }
+
+            result.append(current);
+            index++;
+        }
+
+        return result.toString();
     }
 
-    /**
-     * Replace content into values on content index
-     * @param quote Quote
-     * @param collect Values collection
-     */
-    private void replaceQuoteContent(char quote, HashMap<Integer, String> collect) {
+    private int appendQuoted(String source, StringBuilder result, int start, char quote) {
+        int index = start;
+        result.append(source.charAt(index++));
 
-        if (query.indexOf(quote) == -1) return;
+        while (index < source.length()) {
+            char current = source.charAt(index);
+            result.append(current);
+            index++;
 
-        StringBuilder resultString = new StringBuilder();
-        Matcher valueMatcher = Pattern.compile(quote + "([^" + quote + "]+)" + quote).matcher(query);
+            if (current == '\\' && index < source.length()) {
+                result.append(source.charAt(index++));
+                continue;
+            }
 
-        while (valueMatcher.find()) {
-            //Записываем в коллекцию найденное 'содержимое'
-            collect.put(contentQuoteCounter, quote + valueMatcher.group(1) + quote);
-
-            //Меняет 'содержимое'|"содержимое" на $(contentQuoteCounter): $(0), $(1), ...
-            valueMatcher.appendReplacement(resultString, "\\$\\(" + contentQuoteCounter + "\\)");
-
-            contentQuoteCounter++;
+            if (current != quote) continue;
+            if (index < source.length() && source.charAt(index) == quote) {
+                result.append(source.charAt(index++));
+                continue;
+            }
+            break;
         }
 
-        //Если были найдены строки с содержимым
-        if (!resultString.isEmpty()) {
-            valueMatcher.appendTail(resultString);
-        }
-
-        query = resultString.toString();
-
-        setQueryIsChanged(true);
-
-        debugMessageQuery("After " + quote);
+        return index;
     }
 
-    /**
-     * Restore content into values
-     * @param collect Values collection
-     */
-    private void restoreValueContent(HashMap<Integer, String> collect) {
-        if (!isQueryIsChanged()) return;
+    private int appendLineComment(String source, StringBuilder result, int start) {
+        int index = start;
+        while (index < source.length()) {
+            char current = source.charAt(index++);
+            result.append(current);
+            if (current == '\n' || current == '\r') break;
+        }
+        return index;
+    }
 
-        for (Integer key : collect.keySet()) {
-            query = query.replace("$(" + key + ")", collect.get(key));
+    private int appendBlockComment(String source, StringBuilder result, int start) {
+        int index = start;
+        while (index < source.length()) {
+            char current = source.charAt(index++);
+            result.append(current);
+            if (current == '*' && index < source.length() && source.charAt(index) == '/') {
+                result.append(source.charAt(index++));
+                break;
+            }
+        }
+        return index;
+    }
+
+    private int appendDollarQuoted(String source, StringBuilder result, int start) {
+        int delimiterEnd = source.indexOf('$', start + 1);
+        if (delimiterEnd < 0 || !isDollarTag(source, start + 1, delimiterEnd)) return start;
+
+        String delimiter = source.substring(start, delimiterEnd + 1);
+        int contentEnd = source.indexOf(delimiter, delimiterEnd + 1);
+        if (contentEnd < 0) {
+            result.append(source, start, source.length());
+            return source.length();
         }
 
-        query = query.replace("$(singleQuote)", "\\'").replace("$(doubleQuote)", "\\\"");
+        int end = contentEnd + delimiter.length();
+        result.append(source, start, end);
+        return end;
+    }
 
-        debugMessageQuery("Restore value content");
+    private boolean isDollarTag(String source, int start, int end) {
+        if (start == end) return true;
+        char first = source.charAt(start);
+        if (!isAsciiLetter(first) && first != '_') return false;
+        for (int index = start + 1; index < end; index++) {
+            char current = source.charAt(index);
+            if (!isAsciiLetter(current) && !Character.isDigit(current) && current != '_') return false;
+        }
+        return true;
+    }
+
+    private boolean isTableIdentifier(String source, int start, int end) {
+        if (start == end) return false;
+        for (int index = start; index < end; index++) {
+            char current = source.charAt(index);
+            if (!isAsciiLetter(current) && !Character.isDigit(current) && current != '_') return false;
+        }
+        return true;
+    }
+
+    private boolean isColumnIdentifier(String source, int start, int end) {
+        if (start == end) return false;
+        for (int index = start; index < end; index++) {
+            char current = source.charAt(index);
+            if (!isAsciiLetter(current)
+                    && !Character.isDigit(current)
+                    && current != '_'
+                    && !Character.isWhitespace(current)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean isAsciiLetter(char value) {
+        return value >= 'a' && value <= 'z' || value >= 'A' && value <= 'Z';
+    }
+
+    private boolean hasNext(String source, int index, char expected) {
+        return index + 1 < source.length() && source.charAt(index + 1) == expected;
     }
 
     /**
@@ -288,15 +370,6 @@ public class SqlQueryRebuild {
     }
 
     /**
-     * This query table prefix
-     */
-    private void tablePrefix() {
-        if (query.indexOf('{') == -1) return;
-        query = tablePrefix(query);
-        debugMessageQuery("Change table name");
-    }
-
-    /**
      * Ищет в строке названия таблиц в {} и меняет их на имя таблицы с префиксом в кавычках
      *  //SELECT * FROM pfx_table_name
      *  $AgtySQL.tablePrefix("SELECT * FROM {table_name}");
@@ -309,15 +382,6 @@ public class SqlQueryRebuild {
                 "\\{([a-zA-Z0-9_]+)}",
                 getPrefix() + "$1"
         );
-    }
-
-    /**
-     * This query table prefix without quotes
-     */
-    private void tablePrefixNoQuote() {
-        if (query.indexOf('{') == -1) return;
-        query = tablePrefixNoQuote(query);
-        debugMessageQuery("Change table name (no quote)");
     }
 
     /**
@@ -337,12 +401,4 @@ public class SqlQueryRebuild {
         );
     }
 
-    /**
-     * This query columns quote
-     */
-    private void columnsQuote() {
-        if (query.indexOf('[') == -1) return;
-        query = columnsQuote(query);
-        debugMessageQuery("Change columns");
-    }
 }

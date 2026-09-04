@@ -59,7 +59,7 @@ public final class QueryUpdateBuilder {
         }
         if (offset != null && offset > 0) {
             query.append(" OFFSET ");
-            query.append(limit);
+            query.append(offset);
         }
 
         return query.toString();

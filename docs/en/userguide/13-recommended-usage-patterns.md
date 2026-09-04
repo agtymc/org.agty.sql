@@ -25,3 +25,17 @@
 - avoid implicit assumptions about `RETURNING`;
 - treat `insertAndGet()` and `updateAndGet()` as capability-driven API;
 - define transaction boundaries explicitly.
+
+## Production Safety
+
+- Keep one mutable `AgtySQL`, `Arguments`, or `AgtySqlCursor` instance within a
+  single request/transaction and thread. Pools and pooled data sources may be
+  shared; borrowed handles may not.
+- Keep `throwException=true` so connection and execution failures cannot look
+  like empty query results.
+- Use separate `loginTimeoutSeconds` and `networkTimeoutMillis` values.
+- Keep `logQueryValues=false`. Query logs then redact string, numeric, and
+  dollar-quoted literals; common credential assignments are always redacted.
+- Use `${ENVIRONMENT_VARIABLE}` as the complete value of an ini credential, or
+  construct `AgtySqlConfig` from a secret-manager result. Restrict a local
+  `config.ini` to owner read/write permissions (`chmod 600 config.ini`).

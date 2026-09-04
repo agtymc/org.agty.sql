@@ -4,6 +4,7 @@ import org.agty.sql.AgtySqlCursor;
 import org.agty.sql.AgtySqlOperationSupport;
 import org.agty.sql.data.Arguments;
 import org.agty.sql.interfaces.SqlRow;
+import org.agty.sql.support.PreparedStatementSupport;
 import org.agty.sql.support.RowFactory;
 
 import java.sql.ResultSet;
@@ -43,8 +44,8 @@ public final class ListOperation {
         }
 
         support.debugMessage("AgtySQL.openCursor()", "QUERY: " + query);
-        return new AgtySqlCursor(
-                support.executeQuery(query, arguments.noRebuildQuery()),
+        return support.createManagedCursor(
+                executeQuery(query, arguments),
                 arguments
         );
     }
@@ -60,7 +61,7 @@ public final class ListOperation {
         try {
             if (support.hasQuery(query)) {
                 support.debugMessage("createListResultSet()", "QUERY: " + query);
-                resultSet = support.executeQuery(query, arguments.noRebuildQuery());
+                resultSet = executeQuery(query, arguments);
             } else {
                 support.throwError("AgtySQL.createListResultSet()", "A query is empty");
                 return null;
@@ -72,7 +73,7 @@ public final class ListOperation {
 
                 for (int i = 1; i <= md.getColumnCount(); ++i) {
                     row.setData(
-                            md.getColumnName(i),
+                            md.getColumnLabel(i),
                             arguments.convertValueToString() ? resultSet.getString(i) : resultSet.getObject(i)
                     );
                 }
@@ -80,7 +81,7 @@ public final class ListOperation {
                 list.add(row);
             }
         } catch (SQLException e) {
-            support.throwError("AgSQL.getList()", e.getMessage());
+            support.throwError("AgSQL.getList()", e);
         } finally {
             closeResultSet(resultSet);
         }
@@ -98,7 +99,7 @@ public final class ListOperation {
         if (support.hasQuery(query)) {
             support.debugMessage("createListResultSet(%d)".formatted(index), "QUERY: " + query);
             support.setListResultSet(
-                    support.executeQuery(query, arguments.noRebuildQuery()),
+                    executeQuery(query, arguments),
                     index
             );
         } else {
@@ -116,7 +117,7 @@ public final class ListOperation {
 
                 for (int i = 1; i <= md.getColumnCount(); ++i) {
                     rowData.setData(
-                            md.getColumnName(i),
+                            md.getColumnLabel(i),
                             arguments.convertValueToString() ? resultSet.getString(i) : resultSet.getObject(i)
                     );
                 }
@@ -124,11 +125,23 @@ public final class ListOperation {
                 return rowData;
             }
         } catch (SQLException e) {
-            support.throwError("AgSQL.getList(%d)".formatted(index), e.getMessage());
+            support.throwError("AgSQL.getList(%d)".formatted(index), e);
         }
 
         support.clearListResultSet(index);
         return null;
+    }
+
+    private ResultSet executeQuery(String query, Arguments arguments) {
+        if (!arguments.useStatementPrepare()) {
+            return support.executeQuery(query, arguments.noRebuildQuery());
+        }
+
+        return support.executePreparedQuery(
+                query,
+                PreparedStatementSupport.readParameters(arguments),
+                arguments.noRebuildQuery()
+        );
     }
 
     private void closeResultSet(ResultSet resultSet) {
@@ -164,7 +177,7 @@ public final class ListOperation {
         }
 
         if (exception != null) {
-            support.throwError("AgSQL.closeResultSet()", exception.getMessage());
+            support.throwError("AgSQL.closeResultSet()", exception);
         }
     }
 }

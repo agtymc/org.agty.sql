@@ -1,13 +1,27 @@
 package org.agty.sql.data;
 
+import org.agty.sql.support.SqlIdentifierValidator;
+import org.agty.sql.support.LegacySqlFormatter;
+
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.util.*;
 
 /**
- * Arguments for the query
+ * Arguments for the query.
+ *
+ * <p>This mutable builder is not thread-safe. Do not modify or execute the same
+ * instance concurrently.</p>
  */
 public class Arguments {
 
-    /** Table */
+    private static final String SUPPORTED_DATA_TYPES = "String, Number, Boolean, Character";
+
+    /**
+     * @deprecated Use {@link #setTable(String)} and {@link #getTable()}.
+     * Direct assignments are validated when the value is read.
+     */
+    @Deprecated
     public String table;
 
     /** Fields for query (SELECT fields FROM)*/
@@ -22,6 +36,12 @@ public class Arguments {
     /** A WHERE clause*/
     private String where = "";
 
+    /** A WHERE clause with JDBC placeholders*/
+    private String preparedWhere = "";
+
+    /** Values bound to prepared WHERE placeholders*/
+    private final List<Object> whereParameters = new LinkedList<>();
+
     /** A HAVING clause*/
     private String having = "";
 
@@ -34,11 +54,17 @@ public class Arguments {
     /** Data for query*/
     private final Map<String, Object> data = new LinkedHashMap<>();
 
+    /** Original data values used by PreparedStatement*/
+    private final Map<String, Object> preparedData = new LinkedHashMap<>();
+
     /** Columns set*/
     private final List<String> columns = new LinkedList<>();
 
     /** RAW query*/
     private String query;
+
+    /** Values bound to placeholders in a raw query*/
+    private final List<Object> queryParameters = new LinkedList<>();
 
     /** All values converted to string*/
     private boolean convertValueToString = false;
@@ -58,6 +84,9 @@ public class Arguments {
     /** Returns last insert ID*/
     private boolean returnLastInsertId = false;
 
+    /** Execute high-level queries through PreparedStatement*/
+    private boolean statementPrepare = false;
+
     /** Limit object*/
     private final Limit limit = new Limit();
 
@@ -72,6 +101,27 @@ public class Arguments {
      */
     public static Arguments builder() {
         return new Arguments();
+    }
+
+    /**
+     * Whether high-level operations should use JDBC prepared statements.
+     * The default is {@code false}, which preserves the legacy query rendering.
+     *
+     * @return {@code true} when prepared execution is enabled
+     */
+    public boolean useStatementPrepare() {
+        return statementPrepare;
+    }
+
+    /**
+     * Enables or disables prepared execution for high-level operations.
+     *
+     * @param statementPrepare {@code true} to render values as {@code ?} placeholders
+     * @return current arguments
+     */
+    public Arguments useStatementPrepare(boolean statementPrepare) {
+        this.statementPrepare = statementPrepare;
+        return this;
     }
 
     /**
@@ -139,6 +189,7 @@ public class Arguments {
 
     /**
      * @deprecated use {@link #forceRebuildQuery()}
+     * @return whether forced query rebuilding is enabled
      */
     @Deprecated
     public boolean forceRequery() {
@@ -159,9 +210,10 @@ public class Arguments {
      * Таблица.
      *
      * @param table имя таблицы.
+     * @return current arguments
      */
     public Arguments setTable(String table) {
-        this.table = table;
+        this.table = SqlIdentifierValidator.requireTable(table);
         return this;
     }
 
@@ -172,16 +224,17 @@ public class Arguments {
      * @return имя таблицы.
      */
     public String getTable() {
-       return table;
+       return table == null ? null : SqlIdentifierValidator.requireTable(table);
     }
 
     /**
      * Активное поле.
      *
      * @param actionField имя поля.
+     * @return current arguments
      */
     public Arguments setActionField(String actionField) {
-        this.actionField = actionField;
+        this.actionField = SqlIdentifierValidator.requireColumn(actionField, "action field");
         return this;
     }
 
@@ -198,9 +251,10 @@ public class Arguments {
      * Добавить колонку.
      *
      * @param column имя колонки.
+     * @return current arguments
      */
     public Arguments addColumn(String column) {
-        columns.add(column);
+        columns.add(SqlIdentifierValidator.requireColumn(column, "column"));
         return this;
     }
 
@@ -236,6 +290,7 @@ public class Arguments {
      * Пример: "pfx_my_table", `pfx_my_table`.
      *
      * @return имя таблицы.
+     * @param sqlQueryRebuild query rebuilder
      */
     public String getTablePrefix(SqlQueryRebuild sqlQueryRebuild) {
         return sqlQueryRebuild.tablePrefix( getTable() );
@@ -246,6 +301,7 @@ public class Arguments {
      * Пример: pfx_my_table.
      *
      * @return имя таблицы.
+     * @param sqlQueryRebuild query rebuilder
      */
     public String getTablePrefixNoQuote(SqlQueryRebuild sqlQueryRebuild) {
        return sqlQueryRebuild.tablePrefixNoQuote( getTable() );
@@ -273,9 +329,10 @@ public class Arguments {
      * Назначить основной ключ.
      *
      * @param primaryKey основной ключ.
+     * @return current arguments
      */
     public Arguments setPrimaryKey(String primaryKey) {
-        this.primaryKey = primaryKey;
+        this.primaryKey = SqlIdentifierValidator.requireColumn(primaryKey, "primary key");
         return this;
     }
 
@@ -283,9 +340,23 @@ public class Arguments {
      * Поля таблицы.
      *
      * @param fields поля.
+     * @return current arguments
      */
     public Arguments setFields(String fields) {
-        this.fields = fields;
+        this.fields = fields == null || fields.isBlank()
+                ? fields
+                : SqlIdentifierValidator.requireFieldList(fields);
+        return this;
+    }
+
+    /**
+     * Sets an explicitly trusted fields expression.
+     *
+     * @param fields trusted fields fragment
+     * @return current arguments
+     */
+    public Arguments setFields(SqlExpression fields) {
+        this.fields = requireExpression(fields, "fields");
         return this;
     }
 
@@ -303,19 +374,45 @@ public class Arguments {
      * Условие выборки.
      *
      * @param where условие выборки.
+     * @return current arguments
+     * @deprecated This overload accepts trusted raw SQL. Use parameterized
+     * {@link #setWhere(String, Object...)} or explicitly mark a static fragment
+     * with {@link #setWhere(SqlExpression)}.
      */
+    @Deprecated
     public Arguments setWhere(String where) {
+        if (where != null && !where.isBlank()) {
+            throw new IllegalArgumentException(
+                    "WHERE is a SQL expression; use parameters or setWhere(SqlExpression.trusted(...))"
+            );
+        }
         this.where = where;
+        this.preparedWhere = where;
+        this.whereParameters.clear();
         return this;
+    }
+
+    /**
+     * Sets an explicitly trusted WHERE expression.
+     *
+     * @param where trusted WHERE expression
+     * @return current arguments
+     */
+    public Arguments setWhere(SqlExpression where) {
+        return setTrustedWhere(requireExpression(where, "WHERE"));
     }
     /**
      * Условие выборки.
      *
      * @param query условие выборки.
      * @param args массив параметров.
+     * @return current arguments
      */
     public Arguments setWhere(String query, Object ...args) {
-        this.where = query.formatted(args);
+        this.where = renderWhere(query, args);
+        this.preparedWhere = query;
+        this.whereParameters.clear();
+        Collections.addAll(this.whereParameters, args);
         return this;
     }
 
@@ -323,9 +420,32 @@ public class Arguments {
      * Условие выборки с последовательным добавлением.
      *
      * @param where условие выборки.
+     * @return current arguments
+     * @deprecated This overload appends trusted raw SQL. Use the parameterized
+     * overload or {@link #appendWhere(SqlExpression)}.
      */
+    @Deprecated
     public Arguments appendWhere(String where) {
+        if (where != null && !where.isBlank()) {
+            throw new IllegalArgumentException(
+                    "WHERE is a SQL expression; use parameters or appendWhere(SqlExpression.trusted(...))"
+            );
+        }
         this.where += where;
+        this.preparedWhere += where;
+        return this;
+    }
+
+    /**
+     * Appends an explicitly trusted WHERE expression.
+     *
+     * @param where trusted WHERE expression
+     * @return current arguments
+     */
+    public Arguments appendWhere(SqlExpression where) {
+        String expression = requireExpression(where, "WHERE");
+        this.where += expression;
+        this.preparedWhere += expression;
         return this;
     }
 
@@ -333,9 +453,13 @@ public class Arguments {
      * Условие выборки с последовательным добавлением.
      *
      * @param where условие выборки.
+     * @param args values for the appended placeholders
+     * @return current arguments
      */
     public Arguments appendWhere(String where, Object ...args) {
-        this.where += query.formatted(args);
+        this.where += renderWhere(where, args);
+        this.preparedWhere += where;
+        Collections.addAll(this.whereParameters, args);
         return this;
     }
 
@@ -346,7 +470,16 @@ public class Arguments {
      * @return условие выборки.
      */
     public String getWhere() {
-        return where;
+        return useStatementPrepare() ? preparedWhere : where;
+    }
+
+    /**
+     * Values for {@code ?} placeholders in the prepared WHERE clause.
+     *
+     * @return parameter values in declaration order
+     */
+    public List<Object> getWhereParameters() {
+        return new LinkedList<>(whereParameters);
     }
 
     /**
@@ -362,9 +495,29 @@ public class Arguments {
      * Постусловие HAVING.
      *
      * @param having постусловие.
+     * @return current arguments
+     * @deprecated Use {@link #setHaving(SqlExpression)} for an explicitly
+     * trusted SQL expression.
      */
+    @Deprecated
     public Arguments setHaving(String having) {
+        if (having != null && !having.isBlank()) {
+            throw new IllegalArgumentException(
+                    "HAVING is a SQL expression; use setHaving(SqlExpression.trusted(...))"
+            );
+        }
         this.having = having;
+        return this;
+    }
+
+    /**
+     * Sets an explicitly trusted HAVING expression.
+     *
+     * @param having trusted HAVING fragment
+     * @return current arguments
+     */
+    public Arguments setHaving(SqlExpression having) {
+        this.having = requireExpression(having, "HAVING");
         return this;
     }
 
@@ -381,9 +534,23 @@ public class Arguments {
      * Группировка в запросе.
      *
      * @param groupBy условие группировки.
+     * @return current arguments
      */
     public Arguments setGroupBy(String groupBy) {
-        this.groupBy = groupBy;
+        this.groupBy = groupBy == null || groupBy.isBlank()
+                ? groupBy
+                : SqlIdentifierValidator.requireGroupBy(groupBy);
+        return this;
+    }
+
+    /**
+     * Sets an explicitly trusted GROUP BY expression.
+     *
+     * @param groupBy trusted grouping fragment
+     * @return current arguments
+     */
+    public Arguments setGroupBy(SqlExpression groupBy) {
+        this.groupBy = requireExpression(groupBy, "GROUP BY");
         return this;
     }
 
@@ -400,9 +567,23 @@ public class Arguments {
      * Сортировка в запросе.
      *
      * @param orderBy условие сортировки.
+     * @return current arguments
      */
     public Arguments setOrderBy(String orderBy) {
-        this.orderBy = orderBy;
+        this.orderBy = orderBy == null || orderBy.isBlank()
+                ? orderBy
+                : SqlIdentifierValidator.requireOrderBy(orderBy);
+        return this;
+    }
+
+    /**
+     * Sets an explicitly trusted ORDER BY expression.
+     *
+     * @param orderBy trusted sorting fragment
+     * @return current arguments
+     */
+    public Arguments setOrderBy(SqlExpression orderBy) {
+        this.orderBy = requireExpression(orderBy, "ORDER BY");
         return this;
     }
 
@@ -477,6 +658,7 @@ public class Arguments {
      *      - 0,10 // выбрать 10 строк
      *
      * @param limitString ограничение выборки.
+     * @return current arguments
      */
     public Arguments setLimit(String limitString) {
         if (limitString.contains(",")) {
@@ -590,9 +772,46 @@ public class Arguments {
      *      LIMIT 100
      *
      * @param query произвольный запрос.
+     * @return current arguments
+     * @deprecated This overload accepts trusted raw SQL. Prefer prepared
+     * {@link #setQuery(String, Object...)} or {@link #setQuery(SqlExpression)}.
      */
+    @Deprecated
     public Arguments setQuery(String query) {
+        if (query != null && !query.isBlank()) {
+            throw new IllegalArgumentException(
+                    "Raw query must be explicitly trusted with setQuery(SqlExpression.trusted(...))"
+            );
+        }
         this.query = query;
+        this.queryParameters.clear();
+        return this;
+    }
+
+    /**
+     * Sets an explicitly trusted complete SQL query.
+     *
+     * @param query trusted query
+     * @return current arguments
+     */
+    public Arguments setQuery(SqlExpression query) {
+        this.query = requireExpression(query, "query");
+        this.queryParameters.clear();
+        return this;
+    }
+
+    /**
+     * Sets a raw query and values for its JDBC placeholders.
+     * Parameters are used only when {@link #useStatementPrepare(boolean)} is enabled.
+     *
+     * @param query raw query containing {@code ?} placeholders
+     * @param parameters placeholder values in declaration order
+     * @return current arguments
+     */
+    public Arguments setQuery(String query, Object ...parameters) {
+        this.query = query;
+        this.queryParameters.clear();
+        Collections.addAll(this.queryParameters, parameters);
         return this;
     }
 
@@ -606,6 +825,15 @@ public class Arguments {
     }
 
     /**
+     * Values for {@code ?} placeholders in the raw query.
+     *
+     * @return parameter values in declaration order
+     */
+    public List<Object> getQueryParameters() {
+        return new LinkedList<>(queryParameters);
+    }
+
+    /**
      * Проверка наличия запроса query. Во всех классах query имеет приоритет.
      *
      * @return true если запрос создан и не пустой.
@@ -615,35 +843,301 @@ public class Arguments {
     }
 
     /**
-     * Данные запроса. Где field имя поля в базе, value его содержание.
-     *
-     * @param field имя поля.
-     * @param value содержимое поля.
-     * @return текущий объект Arguments
+     * Adds a string value.
+     * @param field column name
+     * @param value value
+     * @return current arguments
      */
     public Arguments addData(String field, String value) {
-        if (value != null && value.endsWith("\\")) value = value.replaceAll("\\\\+$", "");
-        dataPut(field, value);
-        return this;
+        return addDataString(field, value);
     }
 
+    /**
+     * Adds an integer value.
+     * @param field column name
+     * @param value value
+     * @return current arguments
+     */
     public Arguments addData(String field, Integer value) {
-        dataPut(field, value);
-        return this;
+        return addDataInt(field, value);
     }
 
+    /**
+     * Adds a long value.
+     * @param field column name
+     * @param value value
+     * @return current arguments
+     */
     public Arguments addData(String field, Long value) {
-        dataPut(field, value);
-        return this;
+        return addDataLong(field, value);
     }
 
+    /**
+     * Adds a short value.
+     * @param field column name
+     * @param value value
+     * @return current arguments
+     */
     public Arguments addData(String field, Short value) {
-        dataPut(field, value);
+        return addDataShort(field, value);
+    }
+
+    /**
+     * Adds a boolean value.
+     * @param field column name
+     * @param value value
+     * @return current arguments
+     */
+    public Arguments addData(String field, Boolean value) {
+        return addDataBoolean(field, value);
+    }
+
+    /**
+     * Adds a float value.
+     * @param field column name
+     * @param value value
+     * @return current arguments
+     */
+    public Arguments addData(String field, Float value) {
+        return addDataFloat(field, value);
+    }
+
+    /**
+     * Adds a double value.
+     * @param field column name
+     * @param value value
+     * @return current arguments
+     */
+    public Arguments addData(String field, Double value) {
+        return addDataDouble(field, value);
+    }
+
+    /**
+     * Adds a character value.
+     * @param field column name
+     * @param value value
+     * @return current arguments
+     */
+    public Arguments addData(String field, Character value) {
+        return addDataChar(field, value);
+    }
+
+    /**
+     * Adds a dynamically typed value after validating its runtime type.
+     *
+     * @param field column name
+     * @param value supported scalar value
+     * @return current arguments
+     * @throws IllegalArgumentException when the value is not a supported scalar
+     */
+    public Arguments addData(String field, Object value) {
+        if (value == null) {
+            dataPut(field, null);
+            return this;
+        }
+        if (value instanceof String) {
+            return addDataString(field, value);
+        }
+        if (value instanceof Number) {
+            return addDataDecimal(field, value);
+        }
+        if (value instanceof Boolean) {
+            return addDataBoolean(field, value);
+        }
+        if (value instanceof Character) {
+            return addDataChar(field, value);
+        }
+
+        throw unsupportedDataType(field, value);
+    }
+
+    /**
+     * Adds a value only when its runtime type is {@link String}.
+     * @param field column name
+     * @param value value to validate
+     * @return current arguments
+     */
+    public Arguments addDataString(String field, Object value) {
+        String stringValue = requireDataType(field, value, String.class);
+        dataPut(field, stringValue, stringValue);
         return this;
     }
 
-    public Arguments addData(String field, Boolean value) {
-        dataPut(field, value);
+    /**
+     * Adds a value only when its runtime type is {@link Integer}.
+     * @param field column name
+     * @param value value to validate
+     * @return current arguments
+     */
+    public Arguments addDataInt(String field, Object value) {
+        dataPut(field, requireDataType(field, value, Integer.class));
+        return this;
+    }
+
+    /**
+     * Alias for {@link #addDataInt(String, Object)}.
+     * @param field column name
+     * @param value value to validate
+     * @return current arguments
+     */
+    public Arguments addDataInteger(String field, Object value) {
+        return addDataInt(field, value);
+    }
+
+    /**
+     * Adds a value only when its runtime type is {@link Long}.
+     * @param field column name
+     * @param value value to validate
+     * @return current arguments
+     */
+    public Arguments addDataLong(String field, Object value) {
+        dataPut(field, requireDataType(field, value, Long.class));
+        return this;
+    }
+
+    /**
+     * Adds a value only when its runtime type is {@link Short}.
+     * @param field column name
+     * @param value value to validate
+     * @return current arguments
+     */
+    public Arguments addDataShort(String field, Object value) {
+        dataPut(field, requireDataType(field, value, Short.class));
+        return this;
+    }
+
+    /**
+     * Adds a value only when its runtime type is {@link Byte}.
+     * @param field column name
+     * @param value value to validate
+     * @return current arguments
+     */
+    public Arguments addDataByte(String field, Object value) {
+        dataPut(field, requireDataType(field, value, Byte.class));
+        return this;
+    }
+
+    /**
+     * Adds a value only when its runtime type is {@link Boolean}.
+     * @param field column name
+     * @param value value to validate
+     * @return current arguments
+     */
+    public Arguments addDataBoolean(String field, Object value) {
+        dataPut(field, requireDataType(field, value, Boolean.class));
+        return this;
+    }
+
+    /**
+     * Alias for {@link #addDataBoolean(String, Object)}.
+     * @param field column name
+     * @param value value to validate
+     * @return current arguments
+     */
+    public Arguments addDataBool(String field, Object value) {
+        return addDataBoolean(field, value);
+    }
+
+    /**
+     * Adds a value only when its runtime type is {@link Float}.
+     * @param field column name
+     * @param value value to validate
+     * @return current arguments
+     */
+    public Arguments addDataFloat(String field, Object value) {
+        Float number = requireDataType(field, value, Float.class);
+        validateFiniteNumber(field, number);
+        dataPut(field, number);
+        return this;
+    }
+
+    /**
+     * Adds a value only when its runtime type is {@link Double}.
+     * @param field column name
+     * @param value value to validate
+     * @return current arguments
+     */
+    public Arguments addDataDouble(String field, Object value) {
+        Double number = requireDataType(field, value, Double.class);
+        validateFiniteNumber(field, number);
+        dataPut(field, number);
+        return this;
+    }
+
+    /**
+     * Adds any numeric value. Standard {@link Number} implementations retain
+     * their type; other implementations are normalized to {@link BigDecimal}.
+     *
+     * @param field column name
+     * @param value numeric value to validate
+     * @return current arguments
+     */
+    public Arguments addDataDecimal(String field, Object value) {
+        Number number = requireDataType(field, value, Number.class);
+        dataPut(field, normalizeNumber(field, number));
+        return this;
+    }
+
+    /**
+     * Alias for {@link #addDataDecimal(String, Object)}.
+     * @param field column name
+     * @param value numeric value to validate
+     * @return current arguments
+     */
+    public Arguments addDataNumber(String field, Object value) {
+        return addDataDecimal(field, value);
+    }
+
+    /**
+     * Adds a value only when its runtime type is {@link BigDecimal}.
+     * @param field column name
+     * @param value value to validate
+     * @return current arguments
+     */
+    public Arguments addDataBigDecimal(String field, Object value) {
+        dataPut(field, requireDataType(field, value, BigDecimal.class));
+        return this;
+    }
+
+    /**
+     * Adds a value only when its runtime type is {@link BigInteger}.
+     * @param field column name
+     * @param value value to validate
+     * @return current arguments
+     */
+    public Arguments addDataBigInteger(String field, Object value) {
+        dataPut(field, requireDataType(field, value, BigInteger.class));
+        return this;
+    }
+
+    /**
+     * Adds a value only when its runtime type is {@link Character}.
+     * @param field column name
+     * @param value value to validate
+     * @return current arguments
+     */
+    public Arguments addDataChar(String field, Object value) {
+        dataPut(field, requireDataType(field, value, Character.class));
+        return this;
+    }
+
+    /**
+     * Alias for {@link #addDataChar(String, Object)}.
+     * @param field column name
+     * @param value value to validate
+     * @return current arguments
+     */
+    public Arguments addDataCharacter(String field, Object value) {
+        return addDataChar(field, value);
+    }
+
+    /**
+     * Adds an explicit SQL NULL value without overload ambiguity.
+     * @param field column name
+     * @return current arguments
+     */
+    public Arguments addDataNull(String field) {
+        dataPut(field, null);
         return this;
     }
 
@@ -656,27 +1150,14 @@ public class Arguments {
      * @return текущий объект Arguments.
      */
     public Arguments addData(String field, boolean value, String driver) {
-        dataPut(field, Arguments.getBooleanValueForDriver(value, driver));
-        return this;
-    }
-
-    public Arguments addData(String field, Float value) {
-        dataPut(field, value);
-        return this;
-    }
-
-    public Arguments addData(String field, Double value) {
-        dataPut(field, value);
-        return this;
-    }
-
-    public Arguments addData(String field, Character value) {
-        dataPut(field, value);
-        return this;
+        return addData(field, Arguments.getBooleanValueForDriver(value, driver));
     }
 
     /**
      * @deprecated use {@link #addData(String, String)}
+     * @param field column name
+     * @param value value
+     * @return current arguments
      */
     @Deprecated
     public Arguments setData(String field, String value) {
@@ -685,6 +1166,9 @@ public class Arguments {
 
     /**
      * @deprecated use {@link #addData(String, Integer)}
+     * @param field column name
+     * @param value value
+     * @return current arguments
      */
     @Deprecated
     public Arguments setData(String field, Integer value) {
@@ -693,6 +1177,9 @@ public class Arguments {
 
     /**
      * @deprecated use {@link #addData(String, Long)}
+     * @param field column name
+     * @param value value
+     * @return current arguments
      */
     @Deprecated
     public Arguments setData(String field, Long value) {
@@ -701,6 +1188,9 @@ public class Arguments {
 
     /**
      * @deprecated use {@link #addData(String, Short)}
+     * @param field column name
+     * @param value value
+     * @return current arguments
      */
     @Deprecated
     public Arguments setData(String field, Short value) {
@@ -709,6 +1199,9 @@ public class Arguments {
 
     /**
      * @deprecated use {@link #addData(String, Boolean)}
+     * @param field column name
+     * @param value value
+     * @return current arguments
      */
     @Deprecated
     public Arguments setData(String field, Boolean value) {
@@ -717,6 +1210,9 @@ public class Arguments {
 
     /**
      * @deprecated use {@link #addData(String, Float)}
+     * @param field column name
+     * @param value value
+     * @return current arguments
      */
     @Deprecated
     public Arguments setData(String field, Float value) {
@@ -725,6 +1221,9 @@ public class Arguments {
 
     /**
      * @deprecated use {@link #addData(String, Double)}
+     * @param field column name
+     * @param value value
+     * @return current arguments
      */
     @Deprecated
     public Arguments setData(String field, Double value) {
@@ -733,6 +1232,9 @@ public class Arguments {
 
     /**
      * @deprecated use {@link #addData(String, Character)}
+     * @param field column name
+     * @param value value
+     * @return current arguments
      */
     @Deprecated
     public Arguments setData(String field, Character value) {
@@ -740,7 +1242,106 @@ public class Arguments {
     }
 
     private void dataPut(String field, Object value) {
-        data.put(field, value);
+        dataPut(field, value, value);
+    }
+
+    private void dataPut(String field, Object legacyValue, Object preparedValue) {
+        SqlIdentifierValidator.requireColumn(field, "data field");
+        data.put(field, legacyValue);
+        preparedData.put(field, preparedValue);
+    }
+
+    private String requireExpression(SqlExpression expression, String role) {
+        if (expression == null) {
+            throw new IllegalArgumentException(role + " expression must not be null");
+        }
+        return expression.sql();
+    }
+
+    private Arguments setTrustedWhere(String expression) {
+        this.where = expression;
+        this.preparedWhere = expression;
+        this.whereParameters.clear();
+        return this;
+    }
+
+    private String renderWhere(String template, Object... values) {
+        if (useStatementPrepare() || template.indexOf('?') >= 0) {
+            return template;
+        }
+        return LegacySqlFormatter.format(template, values);
+    }
+
+    private <T> T requireDataType(String field, Object value, Class<T> expectedType) {
+        if (value == null) {
+            return null;
+        }
+        if (!expectedType.isInstance(value)) {
+            throw new IllegalArgumentException(
+                    "Invalid data type for field '%s': expected %s, got %s".formatted(
+                            field,
+                            expectedType.getSimpleName(),
+                            value.getClass().getName()
+                    )
+            );
+        }
+        return expectedType.cast(value);
+    }
+
+    private Number normalizeNumber(String field, Number value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Float || value instanceof Double) {
+            validateFiniteNumber(field, value);
+        }
+        if (value instanceof Byte
+                || value instanceof Short
+                || value instanceof Integer
+                || value instanceof Long
+                || value instanceof Float
+                || value instanceof Double
+                || value instanceof BigInteger
+                || value instanceof BigDecimal) {
+            return value;
+        }
+
+        try {
+            return new BigDecimal(value.toString());
+        } catch (NumberFormatException exception) {
+            throw new IllegalArgumentException(
+                    "Unsupported Number implementation for field '%s': %s".formatted(
+                            field,
+                            value.getClass().getName()
+                    ),
+                    exception
+            );
+        }
+    }
+
+    private void validateFiniteNumber(String field, Number value) {
+        if (value instanceof Float floatValue && !Float.isFinite(floatValue)) {
+            throw invalidDecimalValue(field, value);
+        }
+        if (value instanceof Double doubleValue && !Double.isFinite(doubleValue)) {
+            throw invalidDecimalValue(field, value);
+        }
+    }
+
+    private IllegalArgumentException invalidDecimalValue(String field, Number value) {
+        return new IllegalArgumentException(
+                "Invalid decimal value for field '%s': %s is not finite".formatted(field, value)
+        );
+    }
+
+    private IllegalArgumentException unsupportedDataType(String field, Object value) {
+        return new IllegalArgumentException(
+                "Unsupported data type for field '%s': %s. Supported types: %s".formatted(
+                        field,
+                        value.getClass().getName(),
+                        SUPPORTED_DATA_TYPES
+                )
+        );
     }
 
     /**
@@ -774,10 +1375,12 @@ public class Arguments {
      */
     public void removeData(String field) {
         data.remove(field);
+        preparedData.remove(field);
     }
 
     /**
      * @deprecated use {@link #removeData(String)}
+     * @param field column name
      */
     @Deprecated
     public void removeFromData(String field) {
@@ -789,6 +1392,7 @@ public class Arguments {
      */
     public void clearData() {
         data.clear();
+        preparedData.clear();
     }
 
     /**
@@ -806,11 +1410,12 @@ public class Arguments {
      * @return копия коллекции массива с данными.
      */
     public LinkedHashMap<String, Object> getDataMap() {
-        return new LinkedHashMap<String, Object>(data);
+        return new LinkedHashMap<String, Object>(useStatementPrepare() ? preparedData : data);
     }
 
     /**
      * @deprecated use {@link #getDataMap()}
+     * @return copied data map
      */
     @Deprecated
     public LinkedHashMap<String, Object> getDataArray() {
@@ -824,11 +1429,13 @@ public class Arguments {
      * @return объект содержимого.
      */
     public Object getData(String key) {
-        return data.get(key);
+        return (useStatementPrepare() ? preparedData : data).get(key);
     }
 
     /**
      * @deprecated use {@link #getData(String)}
+     * @param key data key
+     * @return stored value
      */
     @Deprecated
     public Object getFromData(String key) {
@@ -860,7 +1467,7 @@ public class Arguments {
      * @return массив значений.
      */
     public LinkedList<Object> getDataValues() {
-        return new LinkedList<Object>(data.values());
+        return new LinkedList<Object>((useStatementPrepare() ? preparedData : data).values());
     }
 
     /**
@@ -887,12 +1494,18 @@ public class Arguments {
      * возвращаться в виде строки.
      *
      * @param valueToString true если необходимо возвращать данные в виде строки.
+     * @return current arguments
      */
     public Arguments convertValueToString(boolean valueToString) {
         this.convertValueToString = valueToString;
         return this;
     }
 
+    /**
+     * Reports whether fetched values should be converted to strings.
+     *
+     * @return whether string conversion is enabled
+     */
     public boolean convertValueToString() {
         return convertValueToString;
     }
@@ -941,7 +1554,7 @@ public class Arguments {
         toString.append("\n");
 
         toString.append("\t\twhere = ");
-        toString.append(where);
+        toString.append(getWhere());
         toString.append("\n");
 
         toString.append("\t\thaving = ");

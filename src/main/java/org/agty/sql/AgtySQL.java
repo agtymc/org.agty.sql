@@ -11,6 +11,7 @@ import org.agty.sql.data.ListResultSet;
 import org.agty.sql.driver.DialectCapabilities;
 import org.agty.sql.exceptions.AgtySqlException;
 import org.agty.sql.data.Arguments;
+import org.agty.sql.data.SqlExpression;
 import org.agty.sql.interfaces.SqlRow;
 import org.agty.sql.model.ModelControl;
 import org.agty.sql.model.SaveModelMode;
@@ -24,8 +25,11 @@ import org.agty.sql.operations.UpdateOperation;
 import org.agty.sql.support.DebugMessages;
 import org.agty.sql.support.Errors;
 import org.agty.sql.support.Logger;
+import org.agty.sql.support.ManagedResultSet;
 import org.agty.sql.support.RowFactory;
 import org.agty.sql.support.SqlTextUtils;
+import org.agty.sql.support.SqlIdentifierValidator;
+import org.agty.sql.support.SqlLogSanitizer;
 import org.agty.sql.interfaces.Sql;
 
 import java.io.IOException;
@@ -33,9 +37,14 @@ import java.sql.*;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Main session-like facade of the library.
+ *
+ * <p>Instances are mutable and are not thread-safe. Use one instance per
+ * request, transaction, or borrowed pool lease and close it after use.</p>
  *
  * <p>{@code AgtySQL} remains the primary public entry point for {@code 2.x} and
  * combines three documented usage modes:
@@ -56,9 +65,9 @@ import java.util.List;
  * the whole {@code 2.x} lifecycle. New code should target the non-deprecated
  * methods documented above.
  */
-public class AgtySQL {
+public class AgtySQL implements AutoCloseable {
     /** Version */
-    final public static String VERSION = "1.26.01";
+    final public static String VERSION = "2.1.0";
 
     /** Connection and statement*/
     private final AgtySqlConnector connector;
@@ -84,6 +93,8 @@ public class AgtySQL {
 
     /** Данные для list() */
     private final List<ListResultSet> listResultSetPool = new ArrayList<>();
+    private final Set<ResultSet> managedResultSets = ConcurrentHashMap.newKeySet();
+    private final Set<AgtySqlCursor> managedCursors = ConcurrentHashMap.newKeySet();
 
     /**
      * Constructor.
@@ -97,6 +108,8 @@ public class AgtySQL {
     /**
      * Constructor.
      * The constructor by the server section
+     *
+     * @param server configuration section name
      */
     public AgtySQL(String server) {
         connector = new AgtySqlConnector(server);
@@ -106,6 +119,9 @@ public class AgtySQL {
     /**
      * Constructor.
      * The constructor by the server section into the property file
+     *
+     * @param server configuration section name
+     * @param path configuration file path
      */
     public AgtySQL(String server, String path) {
         connector = new AgtySqlConnector(server, path);
@@ -115,6 +131,8 @@ public class AgtySQL {
     /**
      * Constructor.
      * The constructor with AgtySqlConfigBuilder.
+     *
+     * @param agtySqlConfig connection configuration
      */
     public AgtySQL(AgtySqlConfig agtySqlConfig) {
         connector = new AgtySqlConnector(agtySqlConfig);
@@ -124,6 +142,8 @@ public class AgtySQL {
     /**
      * Constructor.
      * The constructor with AgtySqlConnector.
+     *
+     * @param agtySqlConnector connector used by this facade
      */
     public AgtySQL(AgtySqlConnector agtySqlConnector) {
         connector = agtySqlConnector;
@@ -138,16 +158,19 @@ public class AgtySQL {
         return connector;
     }
 
+    /** Last query executed through the facade. */
     public String lastQuery = "";
 
     /**
      * Connect to the server DB.
+     *
+     * @return this facade
      */
     public AgtySQL connect() {
         try {
             sessionSupport.getConnection();
         } catch (SQLException e) {
-            throwError("AgtySQL.connect()", e.getMessage());
+            throwError("AgtySQL.connect()", e);
         }
         return this;
     }
@@ -155,6 +178,7 @@ public class AgtySQL {
     /**
      * Назначить текущее количество строк возвращаемое за раз
      * @param stmtRows количество строк.
+     * @return this facade
      */
     public AgtySQL setStmtRows(int stmtRows) {
         sessionSupport.setStmtRows(stmtRows);
@@ -163,11 +187,18 @@ public class AgtySQL {
 
     /**
      * Кол-во выборки за раз
+     *
+     * @param fetchSize JDBC fetch size
      */
     public void setFetchSize(int fetchSize) {
         sessionSupport.setFetchSize(fetchSize);
     }
 
+    /**
+     * Returns the configured JDBC fetch size.
+     *
+     * @return JDBC fetch size
+     */
     public int getFetchSize() {
         return sessionSupport.getFetchSize();
     }
@@ -185,7 +216,7 @@ public class AgtySQL {
         try {
             return sessionSupport.getConnection();
         } catch (SQLException e) {
-            throwError("AgtySQL.getConnection()", e.getMessage());
+            throwError("AgtySQL.getConnection()", e);
         }
         return null;
     }
@@ -204,7 +235,7 @@ public class AgtySQL {
         try {
             return sessionSupport.getStatement();
         } catch (SQLException e) {
-            throwError("AgtySQL.getStatement()", e.getMessage());
+            throwError("AgtySQL.getStatement()", e);
         }
         return null;
     }
@@ -219,7 +250,7 @@ public class AgtySQL {
         try {
             return sessionSupport.prepareStatement(prepareQuery(query));
         } catch (SQLException e) {
-            throwError("AgtySQL.prepareStatement()", e.getMessage());
+            throwError("AgtySQL.prepareStatement()", e);
         }
         return null;
     }
@@ -235,7 +266,7 @@ public class AgtySQL {
         try {
             return sessionSupport.prepareStatement(noRebuildQuery ? query : prepareQuery(query));
         } catch (SQLException e) {
-            throwError("AgtySQL.prepareStatement()", e.getMessage());
+            throwError("AgtySQL.prepareStatement()", e);
         }
         return null;
     }
@@ -267,7 +298,7 @@ public class AgtySQL {
                     autoGeneratedKeys
             );
         } catch (SQLException e) {
-            throwError("AgtySQL.prepareStatement()", e.getMessage());
+            throwError("AgtySQL.prepareStatement()", e);
         }
         return null;
     }
@@ -281,11 +312,16 @@ public class AgtySQL {
         setAutoCommit(false);
     }
 
+    /**
+     * Reports the current JDBC auto-commit state.
+     *
+     * @return whether auto-commit is enabled
+     */
     public boolean isAutoCommit() {
         try {
             return sessionSupport.isAutoCommit();
         } catch (SQLException e) {
-            throwError("AgtySQL.isAutoCommit()", e.getMessage());
+            throwError("AgtySQL.isAutoCommit()", e);
         }
         return false;
     }
@@ -329,7 +365,7 @@ public class AgtySQL {
 
             return statement.executeBatch();
         } catch (SQLException e) {
-            throwError("AgtySQL.executeBatch()", e.getMessage());
+            throwError("AgtySQL.executeBatch()", e);
         }
 
         return new int[0];
@@ -359,7 +395,7 @@ public class AgtySQL {
                     Arguments.builder().convertValueToString(convertValueToString)
             );
         } catch (SQLException e) {
-            throwError("AgtySQL.getGeneratedKeys()", e.getMessage());
+            throwError("AgtySQL.getGeneratedKeys()", e);
         }
 
         return RowFactory.emptyRow();
@@ -372,18 +408,20 @@ public class AgtySQL {
         try {
             sessionSupport.commit();
         } catch (SQLException e) {
-            throwError("AgtySqlConnector.commit()", e.getMessage());
+            throwError("AgtySqlConnector.commit()", e);
         }
     }
 
     /**
      * Autocommit
+     *
+     * @param autocommit whether JDBC auto-commit is enabled
      */
     public void setAutoCommit(boolean autocommit) {
         try {
             sessionSupport.setAutoCommit(autocommit);
         } catch (SQLException e) {
-            throwError("AgtySqlConnector.setAutoCommit()", e.getMessage());
+            throwError("AgtySqlConnector.setAutoCommit()", e);
         }
     }
 
@@ -394,29 +432,90 @@ public class AgtySQL {
         try {
             sessionSupport.rollback();
         } catch (SQLException e) {
-            throwError("AgtySqlConnector.rollback()", e.getMessage());
+            throwError("AgtySqlConnector.rollback()", e);
         }
     }
 
     /**
      * Закрывает все соединения и очищает временные данные
      */
+    @Override
     public void close() {
         try {
             closeListCursors();
+            closeManagedCursors();
+            closeManagedResultSets();
             sessionSupport.close();
             clearErrors();
         } catch (SQLException e) {
-            throwError("AgtySQL.close()", e.getMessage());
+            throwError("AgtySQL.close()", e);
+        }
+    }
+
+    private ResultSet manage(ResultSet resultSet, Statement statement) {
+        ResultSet managed = ManagedResultSet.wrap(
+                resultSet,
+                statement,
+                managedResultSets::remove
+        );
+        managedResultSets.add(managed);
+        return managed;
+    }
+
+    AgtySqlCursor createManagedCursor(ResultSet resultSet, Arguments arguments) {
+        if (resultSet == null) {
+            return null;
+        }
+        AgtySqlCursor cursor = new AgtySqlCursor(
+                resultSet,
+                arguments,
+                managedCursors::remove
+        );
+        managedCursors.add(cursor);
+        return cursor;
+    }
+
+    private void closeManagedCursors() {
+        for (AgtySqlCursor cursor : List.copyOf(managedCursors)) {
+            try {
+                cursor.close();
+            } catch (RuntimeException exception) {
+                setAndLogError("AgtySQL.close()", exception.getMessage());
+            }
+        }
+    }
+
+    private void closeManagedResultSets() {
+        for (ResultSet resultSet : Set.copyOf(managedResultSets)) {
+            try {
+                resultSet.close();
+            } catch (SQLException exception) {
+                setAndLogError("AgtySQL.close()", exception.getMessage());
+            }
+        }
+    }
+
+    private void closeAfterFailure(Statement statement, Exception failure) {
+        if (statement == null) {
+            return;
+        }
+        try {
+            statement.close();
+        } catch (SQLException closeException) {
+            failure.addSuppressed(closeException);
         }
     }
 
     /**
      * Добавляем в массив ошибок и сбрасываем в лог
+     *
+     * @param type error source or category
+     * @param error error message
      */
     public void setAndLogError(String type, String error) {
-        errors.addError(type, error);
-        logError(type, error);
+        String sanitizedError = SqlLogSanitizer.sanitizeMessage(error);
+        errors.addError(type, sanitizedError);
+        logError(type, sanitizedError);
     }
 
     /**
@@ -437,17 +536,25 @@ public class AgtySQL {
      * @param query строка запроса
      */
     private void logQuery(String query) {
-        lastQuery = query;
+        String diagnosticQuery = getConfig().isLogQueryValues()
+                ? SqlLogSanitizer.sanitizeMessage(query)
+                : SqlLogSanitizer.sanitizeQuery(query);
+        lastQuery = diagnosticQuery;
 
         if (getConfig().isLogQuery()) {
             try {
-                new Logger(getConfig().getLogQueryFileOrDefault("logs/query.log")).append(query);
+                new Logger(getConfig().getLogQueryFileOrDefault("logs/query.log")).append(diagnosticQuery);
             } catch (IOException e) {
-                throwError("AgtySQL.logQuery()", e.getMessage());
+                throwError("AgtySQL.logQuery()", e);
             }
         }
     }
 
+    /**
+     * Returns the last query executed through the facade.
+     *
+     * @return last query, or an empty string before execution
+     */
     public String getLastQuery() {
         return lastQuery;
     }
@@ -462,6 +569,8 @@ public class AgtySQL {
 
     /**
      * Вернуть все ошибки в виде строки
+     *
+     * @return accumulated errors
      */
     public String getErrors() {
         return errors.getErrors();
@@ -469,6 +578,9 @@ public class AgtySQL {
 
     /**
      * Вернуть все ошибки в виде строки через разделитель
+     *
+     * @param delimiter delimiter between errors
+     * @return accumulated errors
      */
     public String getErrors(String delimiter) {
         return errors.getErrors(delimiter);
@@ -476,6 +588,8 @@ public class AgtySQL {
 
     /**
      * Вернуть все ошибки в виде List
+     *
+     * @return accumulated error messages
      */
     public List<String> getErrorsArray() {
         return errors.getErrorsArray();
@@ -499,6 +613,8 @@ public class AgtySQL {
 
     /**
      * Документированные возможности активного диалекта.
+     *
+     * @return active dialect capabilities
      */
     public DialectCapabilities getDialectCapabilities() {
         return getDriverSqlObject().getCapabilities();
@@ -528,8 +644,20 @@ public class AgtySQL {
         throwException(type, message);
     }
 
+    private void throwError(String type, Throwable cause) {
+        String message = cause.getMessage() == null ? cause.getClass().getSimpleName() : cause.getMessage();
+        setAndLogError(type, message);
+        if (getConfig().isThrowException()) {
+            throw new AgtySqlException(type, SqlLogSanitizer.sanitizeMessage(message), cause);
+        }
+    }
+
     void throwErrorInternal(String type, String message) {
         throwError(type, message);
+    }
+
+    void throwErrorInternal(String type, Throwable cause) {
+        throwError(type, cause);
     }
 
     /**
@@ -604,6 +732,7 @@ public class AgtySQL {
      * полей в скобках [fieldName] на названия в кавычках "fieldName".
      * Тип кавычек зависит от драйвера базы данных.
      *
+     * @param query query to rebuild
      * @return String query
      */
     public String rebuildQuery(String query) {
@@ -615,6 +744,7 @@ public class AgtySQL {
      * Метод ищет все названия таблиц, которые записаны {table_name} и меняет
      * на название с префиксом: `pfx_table_name`.
      *
+     * @param table table expression to rebuild
      * @return String table
      */
     public String rebuildTable(String table) {
@@ -651,11 +781,11 @@ public class AgtySQL {
     private boolean rawStatementExecute(String query) {
         debugMessageEnterInMethod("statementExecute()");
 
-        try {
+        try (Statement statement = getConnector().getStatement()) {
             logQuery(query);
-            return getConnector().getStatement().execute(query);
+            return statement.execute(query);
         } catch (Exception e) {
-            throwError("AgtySQL.statementExecute()", e.getMessage() + "\n[" + query + "]\n");
+            throwError("AgtySQL.statementExecute()", e);
         }
 
         return false;
@@ -678,13 +808,20 @@ public class AgtySQL {
     private ResultSet rawStatementExecuteResultSet(String query) {
         debugMessageEnterInMethod("statementExecuteResultSet()");
 
+        Statement statement = null;
         try {
             logQuery(query);
-            Statement statement = getConnector().getStatement();
+            statement = getConnector().getStatement();
             statement.execute(query);
-            return statement.getResultSet();
+            ResultSet resultSet = statement.getResultSet();
+            if (resultSet == null) {
+                statement.close();
+                return null;
+            }
+            return manage(resultSet, statement);
         } catch (SQLException e) {
-            throwError("AgtySQL.statementExecuteResultSet()",  e.getMessage() + "\n[" + query + "]\n");
+            closeAfterFailure(statement, e);
+            throwError("AgtySQL.statementExecuteResultSet()", e);
         }
 
         return null;
@@ -707,11 +844,14 @@ public class AgtySQL {
     private ResultSet rawStatementExecuteQuery(String query) {
         debugMessageEnterInMethod("statementExecuteQuery()");
 
+        Statement statement = null;
         try {
             logQuery(query);
-            return getConnector().getStatement().executeQuery(query);
+            statement = getConnector().getStatement();
+            return manage(statement.executeQuery(query), statement);
         } catch (Exception e) {
-            throwError("AgtySQL.statementExecuteQuery()", e.getMessage() + "\n[" + query + "]\n");
+            closeAfterFailure(statement, e);
+            throwError("AgtySQL.statementExecuteQuery()", e);
         }
 
         return null;
@@ -734,11 +874,11 @@ public class AgtySQL {
     private Integer rawStatementExecuteUpdate(String query) {
         debugMessageEnterInMethod("statementExecuteUpdate()");
 
-        try {
+        try (Statement statement = getConnector().getStatement()) {
             logQuery(query);
-            return getConnector().getStatement().executeUpdate(query);
+            return statement.executeUpdate(query);
         } catch (Exception e) {
-            throwError("AgtySQL.statementExecuteUpdate()", e.getMessage() + "\n[" + query + "]\n");
+            throwError("AgtySQL.statementExecuteUpdate()", e);
         }
 
         return null;
@@ -761,11 +901,11 @@ public class AgtySQL {
     private Long rawStatementExecuteLargeUpdate(String query) {
         debugMessageEnterInMethod("statementExecuteLargeUpdate()");
 
-        try {
+        try (Statement statement = getConnector().getStatement()) {
             logQuery(query);
-            return getConnector().getStatement().executeLargeUpdate(query);
+            return statement.executeLargeUpdate(query);
         } catch (SQLException e) {
-            throwError("AgtySQL.statementExecuteLargeUpdate()", e.getMessage() + "\n[" + query + "]\n");
+            throwError("AgtySQL.statementExecuteLargeUpdate()", e);
         }
 
         return 0L;
@@ -808,6 +948,13 @@ public class AgtySQL {
         return execute(query, false);
     }
 
+    /**
+     * Executes raw SQL with optional query rebuilding.
+     *
+     * @param query SQL query
+     * @param noRebuildQuery whether query rebuilding is disabled
+     * @return JDBC execution result
+     */
     public boolean execute(String query, boolean noRebuildQuery) {
         debugMessageEnterInMethod("execute(String query, boolean noRebuildQuery)");
         return rawStatementExecute(noRebuildQuery ? query : prepareQuery(query));
@@ -820,6 +967,9 @@ public class AgtySQL {
      * @deprecated Compatibility layer for {@code 2.x}. Use
      * {@link #prepareStatement(String, boolean)} with {@code executeQuery()} or
      * {@link #openCursor(String)}.
+     * @param query SQL query
+     * @param noRebuildQuery whether query rebuilding is disabled
+     * @return managed result set
      */
     @Deprecated
     public ResultSet executeResultSet(String query, boolean noRebuildQuery) {
@@ -835,6 +985,7 @@ public class AgtySQL {
      * Формирует и отправляет запрос.
      *
      * @param query запрос
+     * @param noRebuildQuery whether query rebuilding is disabled
      * @return result
      * @deprecated Compatibility layer for {@code 2.x}. Use
      * {@link #prepareStatement(String, boolean)} with {@code executeQuery()} or
@@ -854,6 +1005,7 @@ public class AgtySQL {
      * Отправляет запрос на изменение данных
      *
      * @param query String
+     * @return affected row count
      */
     public Long executeUpdate(String query) {
         debugMessageEnterInMethod("executeUpdate()");
@@ -907,7 +1059,7 @@ public class AgtySQL {
      * Supported convenience layer over the regular fetch(...) flow.
      *
      * @param arguments Arguments
-     * @param clazz Class<?>
+     * @param clazz entity class
      * @return Entity
      * @param <T> Entity
      */
@@ -921,8 +1073,20 @@ public class AgtySQL {
      *
      * @param query строка запроса.
      * @return SqlRow
+     * @deprecated Use {@link #fetch(SqlExpression)} to mark raw SQL as trusted.
      */
+    @Deprecated
     final public SqlRow fetch(String query) {
+        return fetch(SqlExpression.trusted(query));
+    }
+
+    /**
+     * Fetches one row from an explicitly trusted raw query.
+     *
+     * @param query trusted query
+     * @return fetched row
+     */
+    final public SqlRow fetch(SqlExpression query) {
         return fetch(new Arguments().setQuery(query));
     }
 
@@ -931,9 +1095,25 @@ public class AgtySQL {
      * Supported convenience layer over the regular fetch(String) flow.
      *
      * @param query A query string.
+     * @param object entity instance used as a target type marker
+     * @param <T> entity type
      * @return Entity
+     * @deprecated Use {@link #fetch(SqlExpression, Object)}.
      */
+    @Deprecated
     final public <T> T fetch(String query, T object) {
+        return fetch(SqlExpression.trusted(query), object);
+    }
+
+    /**
+     * Maps one row from an explicitly trusted raw query.
+     *
+     * @param query trusted query
+     * @param object entity instance used as a target type marker
+     * @param <T> entity type
+     * @return mapped entity
+     */
+    final public <T> T fetch(SqlExpression query, T object) {
         return fetch(new Arguments().setQuery(query), object);
     }
 
@@ -942,9 +1122,25 @@ public class AgtySQL {
      * Supported convenience layer over the regular fetch(String) flow.
      *
      * @param query A query string.
+     * @param clazz entity class
+     * @param <T> entity type
      * @return Entity
+     * @deprecated Use {@link #fetch(SqlExpression, Class)}.
      */
+    @Deprecated
     final public <T> T fetch(String query,  Class<?> clazz) {
+        return fetch(SqlExpression.trusted(query), clazz);
+    }
+
+    /**
+     * Maps one row from an explicitly trusted raw query.
+     *
+     * @param query trusted query
+     * @param clazz entity class
+     * @param <T> entity type
+     * @return mapped entity
+     */
+    final public <T> T fetch(SqlExpression query, Class<?> clazz) {
         return fetch(new Arguments().setQuery(query), clazz);
     }
 
@@ -969,7 +1165,7 @@ public class AgtySQL {
         if (resultSet.next()) {
             for (int i = 1; i <= columns; ++i) {
                 returnData.setData(
-                        resultSetMetaData.getColumnName(i),
+                        resultSetMetaData.getColumnLabel(i),
                         arguments.convertValueToString() ? resultSet.getString(i) : resultSet.getObject(i)
                 );
             }
@@ -1066,6 +1262,7 @@ public class AgtySQL {
      * Вставить строку в таблицу.
      *
      * @param arguments объект Arguments.
+     * @param fields validated returning fields
      * @return ID вставленной строки.
      */
     final public SqlRow insertAndGet(Arguments arguments, String fields) {
@@ -1073,6 +1270,24 @@ public class AgtySQL {
         return insertOperation.insertAndGet(arguments, fields);
     }
 
+    /**
+     * Returns fields defined by an explicitly trusted SQL expression.
+     *
+     * @param arguments insert arguments
+     * @param fields trusted returning fields
+     * @return returned row
+     */
+    final public SqlRow insertAndGet(Arguments arguments, SqlExpression fields) {
+        debugMessageEnterInMethod("insertAndGet()");
+        return insertOperation.insertAndGet(arguments, fields);
+    }
+
+    /**
+     * Inserts data and returns the resulting row.
+     *
+     * @param arguments insert arguments
+     * @return returned row
+     */
     final public SqlRow insertAndGet(Arguments arguments) {
         return insertAndGet(arguments, "*");
     }
@@ -1082,8 +1297,20 @@ public class AgtySQL {
      *
      * @param query SQL query
      * @return SqlRow
+     * @deprecated Use {@link #insertAndGet(SqlExpression)}.
      */
+    @Deprecated
     final public SqlRow insertAndGet(String query) {
+        return insertAndGet(SqlExpression.trusted(query));
+    }
+
+    /**
+     * Executes an explicitly trusted raw insert query and returns one row.
+     *
+     * @param query trusted insert query
+     * @return returned row
+     */
+    final public SqlRow insertAndGet(SqlExpression query) {
         return insertAndGet(new Arguments().setQuery(query));
     }
 
@@ -1093,8 +1320,45 @@ public class AgtySQL {
      * @param query SQL query
      * @param fields returning fields
      * @return SqlRow
+     * @deprecated Use {@link #insertAndGet(SqlExpression, String)}.
      */
+    @Deprecated
     final public SqlRow insertAndGet(String query, String fields) {
+        return insertAndGet(SqlExpression.trusted(query), fields);
+    }
+
+    /**
+     * Executes trusted raw insert SQL with validated returning fields.
+     *
+     * @param query trusted insert query
+     * @param fields validated returning fields
+     * @return returned row
+     */
+    final public SqlRow insertAndGet(SqlExpression query, String fields) {
+        return insertAndGet(new Arguments().setQuery(query), fields);
+    }
+
+    /**
+     * Returns expression fields from a raw insert query.
+     *
+     * @param query raw insert query
+     * @param fields trusted returning fields
+     * @return returned row
+     * @deprecated Use {@link #insertAndGet(SqlExpression, SqlExpression)}.
+     */
+    @Deprecated
+    final public SqlRow insertAndGet(String query, SqlExpression fields) {
+        return insertAndGet(SqlExpression.trusted(query), fields);
+    }
+
+    /**
+     * Executes trusted raw insert SQL with trusted returning fields.
+     *
+     * @param query trusted insert query
+     * @param fields trusted returning fields
+     * @return returned row
+     */
+    final public SqlRow insertAndGet(SqlExpression query, SqlExpression fields) {
         return insertAndGet(new Arguments().setQuery(query), fields);
     }
 
@@ -1129,8 +1393,22 @@ public class AgtySQL {
      * @param object entity instance used as a target type marker
      * @param <T> entity type
      * @return mapped entity or null if no row was returned
+     * @deprecated Use {@link #insertAndGet(SqlExpression, Object)}.
      */
+    @Deprecated
     final public <T> T insertAndGet(String query, T object) {
+        return insertAndGet(SqlExpression.trusted(query), object);
+    }
+
+    /**
+     * Maps the result of an explicitly trusted raw insert query.
+     *
+     * @param query trusted insert query
+     * @param object entity instance used as a target type marker
+     * @param <T> entity type
+     * @return mapped entity or {@code null}
+     */
+    final public <T> T insertAndGet(SqlExpression query, T object) {
         return mapSqlRowToEntity(insertAndGet(query), object);
     }
 
@@ -1141,8 +1419,22 @@ public class AgtySQL {
      * @param clazz entity class
      * @param <T> entity type
      * @return mapped entity or null if no row was returned
+     * @deprecated Use {@link #insertAndGet(SqlExpression, Class)}.
      */
+    @Deprecated
     final public <T> T insertAndGet(String query, Class<?> clazz) {
+        return insertAndGet(SqlExpression.trusted(query), clazz);
+    }
+
+    /**
+     * Maps the result of an explicitly trusted raw insert query.
+     *
+     * @param query trusted insert query
+     * @param clazz entity class
+     * @param <T> entity type
+     * @return mapped entity or {@code null}
+     */
+    final public <T> T insertAndGet(SqlExpression query, Class<?> clazz) {
         return mapSqlRowToEntity(insertAndGet(query), clazz);
     }
 
@@ -1150,6 +1442,7 @@ public class AgtySQL {
      * Вставить строку в таблицу.
      *
      * @param arguments объект Arguments.
+     * @param fields validated returning fields
      * @return ID вставленной строки.
      */
     final public SqlRow updateAndGet(Arguments arguments, String fields) {
@@ -1157,6 +1450,24 @@ public class AgtySQL {
         return updateOperation.updateAndGet(arguments, fields);
     }
 
+    /**
+     * Returns fields defined by an explicitly trusted SQL expression.
+     *
+     * @param arguments update arguments
+     * @param fields trusted returning fields
+     * @return returned row
+     */
+    final public SqlRow updateAndGet(Arguments arguments, SqlExpression fields) {
+        debugMessageEnterInMethod("updateAndGet()");
+        return updateOperation.updateAndGet(arguments, fields);
+    }
+
+    /**
+     * Updates data and returns the resulting row.
+     *
+     * @param arguments update arguments
+     * @return returned row
+     */
     final public SqlRow updateAndGet(Arguments arguments) {
         return updateAndGet(arguments, "*");
     }
@@ -1166,8 +1477,20 @@ public class AgtySQL {
      *
      * @param query SQL query
      * @return SqlRow
+     * @deprecated Use {@link #updateAndGet(SqlExpression)}.
      */
+    @Deprecated
     final public SqlRow updateAndGet(String query) {
+        return updateAndGet(SqlExpression.trusted(query));
+    }
+
+    /**
+     * Executes an explicitly trusted raw update query and returns one row.
+     *
+     * @param query trusted update query
+     * @return returned row
+     */
+    final public SqlRow updateAndGet(SqlExpression query) {
         return updateAndGet(new Arguments().setQuery(query));
     }
 
@@ -1177,8 +1500,45 @@ public class AgtySQL {
      * @param query SQL query
      * @param fields returning fields
      * @return SqlRow
+     * @deprecated Use {@link #updateAndGet(SqlExpression, String)}.
      */
+    @Deprecated
     final public SqlRow updateAndGet(String query, String fields) {
+        return updateAndGet(SqlExpression.trusted(query), fields);
+    }
+
+    /**
+     * Executes trusted raw update SQL with validated returning fields.
+     *
+     * @param query trusted update query
+     * @param fields validated returning fields
+     * @return returned row
+     */
+    final public SqlRow updateAndGet(SqlExpression query, String fields) {
+        return updateAndGet(new Arguments().setQuery(query), fields);
+    }
+
+    /**
+     * Returns expression fields from a raw update query.
+     *
+     * @param query raw update query
+     * @param fields trusted returning fields
+     * @return returned row
+     * @deprecated Use {@link #updateAndGet(SqlExpression, SqlExpression)}.
+     */
+    @Deprecated
+    final public SqlRow updateAndGet(String query, SqlExpression fields) {
+        return updateAndGet(SqlExpression.trusted(query), fields);
+    }
+
+    /**
+     * Executes trusted raw update SQL with trusted returning fields.
+     *
+     * @param query trusted update query
+     * @param fields trusted returning fields
+     * @return returned row
+     */
+    final public SqlRow updateAndGet(SqlExpression query, SqlExpression fields) {
         return updateAndGet(new Arguments().setQuery(query), fields);
     }
 
@@ -1213,8 +1573,22 @@ public class AgtySQL {
      * @param object entity instance used as a target type marker
      * @param <T> entity type
      * @return mapped entity or null if no row was returned
+     * @deprecated Use {@link #updateAndGet(SqlExpression, Object)}.
      */
+    @Deprecated
     final public <T> T updateAndGet(String query, T object) {
+        return updateAndGet(SqlExpression.trusted(query), object);
+    }
+
+    /**
+     * Maps the result of an explicitly trusted raw update query.
+     *
+     * @param query trusted update query
+     * @param object entity instance used as a target type marker
+     * @param <T> entity type
+     * @return mapped entity or {@code null}
+     */
+    final public <T> T updateAndGet(SqlExpression query, T object) {
         return mapSqlRowToEntity(updateAndGet(query), object);
     }
 
@@ -1225,14 +1599,29 @@ public class AgtySQL {
      * @param clazz entity class
      * @param <T> entity type
      * @return mapped entity or null if no row was returned
+     * @deprecated Use {@link #updateAndGet(SqlExpression, Class)}.
      */
+    @Deprecated
     final public <T> T updateAndGet(String query, Class<?> clazz) {
+        return updateAndGet(SqlExpression.trusted(query), clazz);
+    }
+
+    /**
+     * Maps the result of an explicitly trusted raw update query.
+     *
+     * @param query trusted update query
+     * @param clazz entity class
+     * @param <T> entity type
+     * @return mapped entity or {@code null}
+     */
+    final public <T> T updateAndGet(SqlExpression query, Class<?> clazz) {
         return mapSqlRowToEntity(updateAndGet(query), clazz);
     }
 
     /**
      * Возвращает ID последней вставленной строки
      *
+     * @param arguments insert metadata
      * @return mixed
      * @deprecated Compatibility layer for {@code 2.x}. Use
      * {@link #insert(Arguments)} with {@code setReturnLastInsertId(true)} or
@@ -1249,6 +1638,8 @@ public class AgtySQL {
 
     /**
      * Вставка множества строк в таблицу.
+     *
+     * @param arguments rows to insert
      */
     final public void insert(ArrayList<Arguments> arguments) {
         insertOperation.insert(arguments);
@@ -1257,6 +1648,7 @@ public class AgtySQL {
     /**
      * Метод обеспечивающий вставку строки или группы строк в таблицу
      *
+     * @param arguments update arguments
      * @return boolean
      */
     final public boolean update(Arguments arguments) {
@@ -1319,6 +1711,7 @@ public class AgtySQL {
      * Метод удаляющий строки из таблицы.
      *
      * @param arguments объект Arguments
+     * @return whether rows were deleted successfully
      */
     final public boolean delete(Arguments arguments) {
         debugMessageEnterInMethod("delete()");
@@ -1475,6 +1868,7 @@ public class AgtySQL {
      * Legacy cursor-like list API with a default index (0).
      * Prefer listArray(...) for eager reads or openCursor(...) for streaming.
      *
+     * @param arguments query arguments
      * @return SqlRow данные строки.
      * @deprecated Compatibility layer for {@code 2.x}. Use
      * {@link #openCursor(Arguments)} for streaming or
@@ -1489,6 +1883,7 @@ public class AgtySQL {
      * Legacy cursor-like list API backed by an internal cursor slot.
      * Prefer listArray(...) for eager reads or openCursor(...) for streaming.
      *
+     * @param arguments query arguments
      * @param index Index of a data list
      * @return SqlRow данные строки.
      * @deprecated Compatibility layer for {@code 2.x}. Use
@@ -1504,7 +1899,8 @@ public class AgtySQL {
     /**
      * Eagerly reads the full result into memory as a linked collection.
      *
-     * @return LinkedList<SqlRow>
+     * @param arguments query arguments
+     * @return {@code LinkedList<SqlRow>}
      */
     public LinkedList<SqlRow> listArray(Arguments arguments) {
         debugMessageEnterInMethod("listArray()");
@@ -1515,7 +1911,8 @@ public class AgtySQL {
      * Получить все строки в виде связанной коллекции.
      * An alias the listArray() method.
      *
-     * @return LinkedList<SqlRow>
+     * @param arguments query arguments
+     * @return {@code LinkedList<SqlRow>}
      * @deprecated Compatibility layer for {@code 2.x}. Use
      * {@link #listArray(Arguments)}.
      */
@@ -1543,8 +1940,20 @@ public class AgtySQL {
      *
      * @param query SQL query
      * @return managed cursor
+     * @deprecated Use {@link #openCursor(SqlExpression)}.
      */
+    @Deprecated
     public AgtySqlCursor openCursor(String query) {
+        return openCursor(SqlExpression.trusted(query));
+    }
+
+    /**
+     * Opens a managed cursor for an explicitly trusted raw query.
+     *
+     * @param query trusted query
+     * @return managed cursor
+     */
+    public AgtySqlCursor openCursor(SqlExpression query) {
         return openCursor(new Arguments().setQuery(query));
     }
 
@@ -1576,7 +1985,7 @@ public class AgtySQL {
         try {
             listResultSet.close();
         } catch (SQLException e) {
-            throwError("AgtySQL.closeListCursor(%d)".formatted(index), e.getMessage());
+            throwError("AgtySQL.closeListCursor(%d)".formatted(index), e);
         } finally {
             listResultSetPool.set(index, null);
         }
@@ -1628,12 +2037,22 @@ public class AgtySQL {
      * Short method.
      * Fetch by table, field and value
      *
+     * @param table validated table name
+     * @param field validated column name
+     * @param value value to bind
+     * @return fetched row
      * @deprecated Compatibility layer for {@code 2.x}. Use
      * {@link #fetch(Arguments)} with {@link Arguments#builder()}.
      */
     @Deprecated
     final public SqlRow getByField(String table, String field, String value) {
-        return fetch(new Arguments().setTable(table).setWhere(field + "=" + value));
+        String validatedField = SqlIdentifierValidator.requireColumn(field, "field");
+        return fetch(
+                Arguments.builder()
+                        .useStatementPrepare(true)
+                        .setTable(table)
+                        .setWhere("[%s] = ?".formatted(validatedField), value)
+        );
     }
 
 
@@ -1641,7 +2060,7 @@ public class AgtySQL {
         try {
             return ModelControl.newModelControl().save(object, this, saveModelMode, returnFields);
         } catch (Exception e) {
-            throwError("AgSQL.save()//[ModelSave: " + saveModelMode.toString() + "]", e.getMessage());
+            throwError("AgSQL.save()//[ModelSave: " + saveModelMode.toString() + "]", e);
         }
         return null;
     }
@@ -1650,7 +2069,7 @@ public class AgtySQL {
         try {
             return ModelControl.newModelControl().saveAndGetField(object, this, saveModelMode, returnField);
         } catch (Exception e) {
-            throwError("AgSQL.saveAndGetField()//[ModelSave: " + saveModelMode.toString() + "]", e.getMessage());
+            throwError("AgSQL.saveAndGetField()//[ModelSave: " + saveModelMode.toString() + "]", e);
         }
 
         return null;
@@ -1683,6 +2102,10 @@ public class AgtySQL {
     /**
      * Insert entity and return the mapped entity result.
      * Supported convenience layer over insertAndGet(...).
+     *
+     * @param object entity to insert
+     * @param <T> entity type
+     * @return mapped saved entity
      */
     final public <T> T insertEntity(T object) {
         return save(object, SaveModelMode.INSERT_ONLY, "*");
@@ -1690,6 +2113,10 @@ public class AgtySQL {
 
     /**
      * Insert entity with a pre-check and return the mapped entity result.
+     *
+     * @param object entity to insert
+     * @param <T> entity type
+     * @return mapped saved entity, or {@code null} when skipped
      */
     final public <T> T insertEntityWithCheck(T object) {
         return save(object, SaveModelMode.INSERT_ONLY_WITH_CHECK, "*");
@@ -1697,6 +2124,10 @@ public class AgtySQL {
 
     /**
      * Update entity and return the mapped entity result.
+     *
+     * @param object entity to update
+     * @param <T> entity type
+     * @return mapped updated entity
      */
     final public <T> T updateEntity(T object) {
         return save(object, SaveModelMode.UPDATE_ONLY, "*");
@@ -1711,6 +2142,10 @@ public class AgtySQL {
 
     /**
      * Insert or update an entity and return the mapped entity result.
+     *
+     * @param object entity to save
+     * @param <T> entity type
+     * @return mapped saved entity
      */
     final public <T> T saveEntity(T object) {
         return save(object, SaveModelMode.WITHOUT_CHECK, "*");
@@ -1718,6 +2153,10 @@ public class AgtySQL {
 
     /**
      * Insert or update an entity with existence check and return the mapped entity result.
+     *
+     * @param object entity to save
+     * @param <T> entity type
+     * @return mapped saved entity
      */
     final public <T> T saveEntityWithCheck(T object) {
         return save(object, SaveModelMode.WITH_CHECK, "*");
@@ -1725,6 +2164,10 @@ public class AgtySQL {
 
     /**
      * Insert entity unless it already exists, then skip and return the mapped entity result.
+     *
+     * @param object entity to insert
+     * @param <T> entity type
+     * @return mapped entity, or {@code null} when skipped
      */
     final public <T> T saveEntityOrSkip(T object) {
         return save(object, SaveModelMode.SAVE_OR_SKIP, "*");
@@ -1732,6 +2175,11 @@ public class AgtySQL {
 
     /**
      * Insert or update an entity and return one mapped field.
+     *
+     * @param object entity to save
+     * @param returnField field to return
+     * @param <T> entity type
+     * @return returned field value
      */
     final public <T> Object saveEntity(T object, String returnField) {
         return saveAndGetField(object, SaveModelMode.WITHOUT_CHECK, returnField);
@@ -1739,6 +2187,11 @@ public class AgtySQL {
 
     /**
      * Insert or update an entity with existence check and return one mapped field.
+     *
+     * @param object entity to save
+     * @param returnField field to return
+     * @param <T> entity type
+     * @return returned field value
      */
     final public <T> Object saveEntityWithCheck(T object, String returnField) {
         return saveAndGetField(object, SaveModelMode.WITH_CHECK, returnField);

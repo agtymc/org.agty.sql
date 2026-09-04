@@ -17,10 +17,11 @@ import java.sql.Statement;
  */
 public class AgtySqlConnector {
 
-    private final int defaultStatementRows = 100;
+    private static final int DEFAULT_STATEMENT_ROWS = 100;
     private int stmtRows;
     private AgtySqlConfig config;
     private Connection connection;
+    private boolean externallyManagedConnection;
     private int fetchSize;
     private boolean noClosable;
 
@@ -38,6 +39,19 @@ public class AgtySqlConnector {
 
     public AgtySqlConnector(AgtySqlConfig agtySqlConfig) {
         configInit(agtySqlConfig);
+    }
+
+    /**
+     * Creates a session around an already leased JDBC connection.
+     * Closing this connector closes the lease, not a pool-owned physical connection.
+     */
+    public AgtySqlConnector(AgtySqlConfig agtySqlConfig, Connection connection) {
+        if (connection == null) {
+            throw new IllegalArgumentException("Connection must not be null");
+        }
+        configInit(agtySqlConfig);
+        this.connection = connection;
+        this.externallyManagedConnection = true;
     }
 
     private void configInit(String server) {
@@ -74,13 +88,17 @@ public class AgtySqlConnector {
         String driver = getConfig().getDriver();
 
         if ("sqlite".equalsIgnoreCase(driver) || "h2".equalsIgnoreCase(driver)) {
-            return getConfig().isDatabase() && !getConfig().getDatabase().isEmpty();
+            return hasText(getConfig().getDatabase());
         }
 
-        return !getConfig().getUser().isEmpty()
-                && !getConfig().getPassword().isEmpty()
-                && !getConfig().getServer().isEmpty()
-                && getConfig().getPort() != 0;
+        return hasText(getConfig().getUser())
+                && hasText(getConfig().getPassword())
+                && hasText(getConfig().getServer())
+                && getConfig().getPort() > 0;
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 
     private String getDriverName() {
@@ -89,6 +107,9 @@ public class AgtySqlConnector {
 
     public Connection getConnection() throws SQLException {
         if (connection == null) {
+            if (externallyManagedConnection) {
+                throw new SQLException("Leased connection is closed");
+            }
             connection = createConnection();
         }
         return connection;
@@ -102,6 +123,9 @@ public class AgtySqlConnector {
         String driver = getConfig().getDriver();
         if ("sqlite".equalsIgnoreCase(driver) || "h2".equalsIgnoreCase(driver)) {
             if (connection.isClosed()) {
+                if (externallyManagedConnection) {
+                    throw new SQLException("Leased connection is closed");
+                }
                 connection = createConnection();
             }
             return;
@@ -109,6 +133,9 @@ public class AgtySqlConnector {
 
         if (!connection.isValid(100)) {
             connection.close();
+            if (externallyManagedConnection) {
+                throw new SQLException("Leased connection is not valid");
+            }
             connection = createConnection();
         }
     }
@@ -117,7 +144,10 @@ public class AgtySqlConnector {
         debugMessage("AgtySqlConnector.createConnect()", "v." + AgtySQL.VERSION + "; server: " + getConfig().getDriver());
 
         if (!isCheckConfig()) {
-            throw new AgtySqlException("AgtySqlConnector.createConnect()", "Config: One of default parameters is null");
+            throw new AgtySqlException(
+                    "AgtySqlConnector.createConnect()",
+                    "Missing required database, server, port, user, or password configuration"
+            );
         }
 
         return new AgtySqlConnection(getConfig(), getDriverName()).getConnection();
@@ -159,7 +189,7 @@ public class AgtySqlConnector {
         try {
             getConnection().setAutoCommit(commit);
         } catch (SQLException e) {
-            throw new AgtySqlException("AgtySqlConnector.setAutoCommit()", e.getMessage());
+            throw new AgtySqlException("AgtySqlConnector.setAutoCommit()", e.getMessage(), e);
         }
     }
 
@@ -192,7 +222,7 @@ public class AgtySqlConnector {
         if (getConfig().getStmtRows() > 0) {
             return getConfig().getStmtRows();
         }
-        return defaultStatementRows;
+        return DEFAULT_STATEMENT_ROWS;
     }
 
     public void setStmtRows(int stmtRows) {

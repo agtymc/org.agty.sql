@@ -2,9 +2,10 @@ package org.agty.sql.model.builders;
 
 import org.agty.sql.model.annotations.Table;
 
+import java.util.Locale;
+
 public class TableBuilder implements TableBuilderInterface {
     private String tableName;
-    private String schemaName;
 
     @Override
     public <T> void buildTableName(T entity) {
@@ -18,7 +19,7 @@ public class TableBuilder implements TableBuilderInterface {
             }
 
         } else {
-            tableName = clazz.getSimpleName().toLowerCase();
+            tableName = clazz.getSimpleName().toLowerCase(Locale.ROOT);
         }
     }
 

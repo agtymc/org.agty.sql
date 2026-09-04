@@ -18,7 +18,7 @@ public class FieldsType implements FieldsTypes {
      * Добавить поле в массив
      * @param field Field
      */
-    protected void add(Field field) {
+    protected final void add(Field field) {
         fields.add(field);
     }
 

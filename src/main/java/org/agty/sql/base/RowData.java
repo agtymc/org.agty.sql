@@ -5,7 +5,6 @@ import org.agty.sql.interfaces.SqlRow;
 import org.agty.sql.support.SqlTextUtils;
 
 import java.text.SimpleDateFormat;
-import java.math.BigInteger;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
@@ -191,28 +190,9 @@ public class RowData extends LinkedHashMap<String, Object> implements SqlRow {
     public Integer getInt(String key) {
         Object value = getValue(key);
         if (value == null) return null;
-
-        if (value instanceof Long) {
-            return ((Long) value).intValue();
-        }
-
-        if (value instanceof Double) {
-            return ((Double) value).intValue();
-        }
-
-        if (value instanceof Float) {
-            return ((Float) value).intValue();
-        }
-
-        if (value instanceof Short) {
-            return ((Short) value).intValue();
-        }
-
-        if (value instanceof BigInteger bigIntegerValue) {
-            return bigIntegerValue.intValue();
-        }
-
-        return isDataStringified() ? Integer.parseInt(value.toString()) : (Integer) value;
+        if (value instanceof Number number) return number.intValue();
+        if (isDataStringified()) return Integer.parseInt(value.toString());
+        throw unsupportedNumericType(key, value);
     }
 
     /**
@@ -225,16 +205,9 @@ public class RowData extends LinkedHashMap<String, Object> implements SqlRow {
     public Long getLong(String key) {
         Object value = getValue(key);
         if (value == null) return null;
-        
-        if (value instanceof Integer integerValue) {
-            return Long.valueOf(integerValue);
-        }
-
-        if (value instanceof BigInteger bigIntegerValue) {
-            return bigIntegerValue.longValue();
-        }
-
-        return isDataStringified() ? Long.parseLong(value.toString()) : (Long) value;
+        if (value instanceof Number number) return number.longValue();
+        if (isDataStringified()) return Long.parseLong(value.toString());
+        throw unsupportedNumericType(key, value);
     }
 
     /**
@@ -247,7 +220,9 @@ public class RowData extends LinkedHashMap<String, Object> implements SqlRow {
     public Double getDouble(String key) {
         Object value = getValue(key);
         if (value == null) return null;
-        return isDataStringified() ? Double.parseDouble(value.toString()) : (Double) value;
+        if (value instanceof Number number) return number.doubleValue();
+        if (isDataStringified()) return Double.parseDouble(value.toString());
+        throw unsupportedNumericType(key, value);
     }
 
     /**
@@ -260,7 +235,9 @@ public class RowData extends LinkedHashMap<String, Object> implements SqlRow {
     public Float getFloat(String key) {
         Object value = getValue(key);
         if (value == null) return null;
-        return isDataStringified() ? Float.parseFloat(value.toString()) : (Float) value;
+        if (value instanceof Number number) return number.floatValue();
+        if (isDataStringified()) return Float.parseFloat(value.toString());
+        throw unsupportedNumericType(key, value);
     }
 
     /**
@@ -273,7 +250,15 @@ public class RowData extends LinkedHashMap<String, Object> implements SqlRow {
     public Short getShort(String key) {
         Object value = getValue(key);
         if (value == null) return null;
-        return isDataStringified() ? Short.parseShort(value.toString()) : (Short) value;
+        if (value instanceof Number number) return number.shortValue();
+        if (isDataStringified()) return Short.parseShort(value.toString());
+        throw unsupportedNumericType(key, value);
+    }
+
+    private IllegalArgumentException unsupportedNumericType(String key, Object value) {
+        return new IllegalArgumentException(
+                "Unsupported numeric value for key '" + key + "': " + value.getClass().getName()
+        );
     }
 
     /**
@@ -389,7 +374,7 @@ public class RowData extends LinkedHashMap<String, Object> implements SqlRow {
         if (dateObject == null) return null;
 
         if (dateObject instanceof Date date) {
-            return Date.from(date.toInstant());
+            return new Date(date.getTime());
         }
 
         if (dateObject instanceof Instant instant) {
@@ -471,20 +456,41 @@ public class RowData extends LinkedHashMap<String, Object> implements SqlRow {
      */
     @Override
     public LocalDate getLocalDate(String key) {
-        Object dateObject = get(key);
+        Object dateObject = getValue(key);
 
         if (dateObject instanceof LocalDate dateLocal) {
             return dateLocal;
         }
 
         if (dateObject instanceof LocalDateTime dateTime) {
-            return LocalDate.from(dateTime);
+            return dateTime.toLocalDate();
+        }
+
+        if (dateObject instanceof java.sql.Date date) {
+            return date.toLocalDate();
         }
 
         if (dateObject instanceof Date date) {
-            Calendar calendar = Calendar.getInstance();
-            calendar.setTime(date);
-            return LocalDate.of(calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH), calendar.get(Calendar.DAY_OF_MONTH));
+            return Instant.ofEpochMilli(date.getTime()).atZone(ZoneId.systemDefault()).toLocalDate();
+        }
+
+        if (dateObject instanceof Instant instant) {
+            return instant.atZone(ZoneId.systemDefault()).toLocalDate();
+        }
+
+        if (dateObject instanceof OffsetDateTime offsetDateTime) {
+            return offsetDateTime.toLocalDate();
+        }
+
+        if (dateObject instanceof ZonedDateTime zonedDateTime) {
+            return zonedDateTime.toLocalDate();
+        }
+
+        if (dateObject instanceof CharSequence) {
+            Date parsed = getDate(key);
+            return parsed == null
+                    ? null
+                    : parsed.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
         }
 
         return null;
@@ -498,23 +504,8 @@ public class RowData extends LinkedHashMap<String, Object> implements SqlRow {
      */
     @Override
     public Integer getYear(String key) {
-        Object dateObject = get(key);
-
-        if (dateObject instanceof Date date) {
-            Calendar calendar = Calendar.getInstance();
-            calendar.setTime(date);
-            return calendar.get(Calendar.YEAR);
-        }
-
-        if (dateObject instanceof LocalDate dateLocal) {
-            return dateLocal.getYear();
-        }
-
-        if (dateObject instanceof LocalDateTime dateTime) {
-            return dateTime.getYear();
-        }
-
-        return null;
+        LocalDate date = getLocalDate(key);
+        return date == null ? null : date.getYear();
     }
 
     /**
@@ -525,24 +516,38 @@ public class RowData extends LinkedHashMap<String, Object> implements SqlRow {
      */
     @Override
     public LocalTime getLocalTime(String key) {
-        Object dateObject = get(key);
+        Object dateObject = getValue(key);
 
-        if (dateObject instanceof LocalDate dateLocal) {
-            return LocalTime.from(dateLocal);
+        if (dateObject instanceof LocalTime localTime) {
+            return localTime;
         }
 
         if (dateObject instanceof LocalDateTime dateTime) {
-            return LocalTime.from(dateTime);
+            return dateTime.toLocalTime();
         }
 
-        if (get(key) instanceof java.sql.Time time) {
+        if (dateObject instanceof java.sql.Time time) {
             return time.toLocalTime();
         }
 
         if (dateObject instanceof Date date) {
-            Instant instant = date.toInstant();
-            ZoneId zoneId = TimeZone.getDefault().toZoneId();
-            return LocalTime.ofInstant(instant, zoneId);
+            return Instant.ofEpochMilli(date.getTime()).atZone(ZoneId.systemDefault()).toLocalTime();
+        }
+
+        if (dateObject instanceof Instant instant) {
+            return instant.atZone(ZoneId.systemDefault()).toLocalTime();
+        }
+
+        if (dateObject instanceof OffsetTime offsetTime) {
+            return offsetTime.toLocalTime();
+        }
+
+        if (dateObject instanceof OffsetDateTime offsetDateTime) {
+            return offsetDateTime.toLocalTime();
+        }
+
+        if (dateObject instanceof ZonedDateTime zonedDateTime) {
+            return zonedDateTime.toLocalTime();
         }
 
         return null;
@@ -556,16 +561,41 @@ public class RowData extends LinkedHashMap<String, Object> implements SqlRow {
      */
     @Override
     public LocalDateTime getLocalDateTime(String key) {
-        Object dateObject = get(key);
+        Object dateObject = getValue(key);
 
         if (dateObject instanceof LocalDateTime localDateTime) {
             return localDateTime;
         }
 
+        if (dateObject instanceof java.sql.Timestamp timestamp) {
+            return timestamp.toLocalDateTime();
+        }
+
+        if (dateObject instanceof LocalDate localDate) {
+            return localDate.atStartOfDay();
+        }
+
         if (dateObject instanceof Date date) {
-            Instant instant = date.toInstant();
-            ZoneId zoneId = TimeZone.getDefault().toZoneId();
-            return LocalDateTime.ofInstant(instant, zoneId);
+            return LocalDateTime.ofInstant(Instant.ofEpochMilli(date.getTime()), ZoneId.systemDefault());
+        }
+
+        if (dateObject instanceof Instant instant) {
+            return LocalDateTime.ofInstant(instant, ZoneId.systemDefault());
+        }
+
+        if (dateObject instanceof OffsetDateTime offsetDateTime) {
+            return offsetDateTime.toLocalDateTime();
+        }
+
+        if (dateObject instanceof ZonedDateTime zonedDateTime) {
+            return zonedDateTime.toLocalDateTime();
+        }
+
+        if (dateObject instanceof CharSequence) {
+            Date parsed = getDate(key);
+            return parsed == null
+                    ? null
+                    : LocalDateTime.ofInstant(parsed.toInstant(), ZoneId.systemDefault());
         }
 
         return null;
@@ -581,7 +611,7 @@ public class RowData extends LinkedHashMap<String, Object> implements SqlRow {
     public String getDateFormat(String key, String format) {
         if (format == null || format.isEmpty()) format = "yyyy-MM-dd HH:mm:ss";
 
-        Object dateObject = get(key);
+        Object dateObject = getValue(key);
 
         if (dateObject instanceof Date date) {
             SimpleDateFormat simpleDateFormat = new SimpleDateFormat(format);
@@ -596,6 +626,31 @@ public class RowData extends LinkedHashMap<String, Object> implements SqlRow {
             return dateLocalTime.format(DateTimeFormatter.ofPattern(format));
         }
 
+        if (dateObject instanceof LocalTime localTime) {
+            return localTime.format(DateTimeFormatter.ofPattern(format));
+        }
+
+        if (dateObject instanceof OffsetDateTime offsetDateTime) {
+            return offsetDateTime.format(DateTimeFormatter.ofPattern(format));
+        }
+
+        if (dateObject instanceof ZonedDateTime zonedDateTime) {
+            return zonedDateTime.format(DateTimeFormatter.ofPattern(format));
+        }
+
+        if (dateObject instanceof Instant instant) {
+            return DateTimeFormatter.ofPattern(format)
+                    .withZone(ZoneId.systemDefault())
+                    .format(instant);
+        }
+
+        if (dateObject instanceof CharSequence) {
+            Date parsed = getDate(key);
+            if (parsed != null) {
+                return new SimpleDateFormat(format).format(parsed);
+            }
+        }
+
         return null;
     }
 
@@ -603,7 +658,7 @@ public class RowData extends LinkedHashMap<String, Object> implements SqlRow {
     public String toString() {
         StringBuilder toString = new StringBuilder();
 
-        if (isEmpty()) return null;
+        if (isEmpty()) return "RowData {}";
 
         toString.append("RowData");
         toString.append( " {\n");

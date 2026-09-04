@@ -12,7 +12,6 @@ public class QueryMinMax extends SqlQuery<QueryMinMax> implements SqlQueries {
     private String query;
 
     private boolean getMax = false;
-    private boolean getMin = false;
 
     public QueryMinMax(Arguments arguments) {
         setArguments(arguments);
@@ -20,13 +19,11 @@ public class QueryMinMax extends SqlQuery<QueryMinMax> implements SqlQueries {
 
     public QueryMinMax getMax() {
         this.getMax = true;
-        this.getMin = false;
         return this;
     }
 
     public QueryMinMax getMin() {
         this.getMax = false;
-        this.getMin = true;
         return this;
     }
 

@@ -22,7 +22,7 @@ public class ModelEntity {
         try {
             attributesBuilderInterface.buildEntity(entity);
         } catch (IllegalAccessException | InvocationTargetException e) {
-            throw new RuntimeException("ModelEntity.buildEntity(attributesBuilderInterface)/" + e);
+            throw new IllegalStateException("Unable to build model attributes", e);
         }
 
         //Потом колонки
@@ -32,7 +32,7 @@ public class ModelEntity {
                 columnsBuilder.addAdditionalFields(attributesBuilderInterface.getAdditionalFields());
             }
         } catch (IllegalAccessException e) {
-            throw new RuntimeException("ModelEntity.buildEntity(columnsBuilder)/" + e);
+            throw new IllegalStateException("Unable to build model columns", e);
         }
 
         //И только затем имя таблицы

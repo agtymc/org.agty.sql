@@ -28,29 +28,72 @@ public class AgtySqlConfigFile {
         String configSection = "db." + server + ".";
         Properties propertyFile = new Properties();
 
-        try {
-            propertyFile.load(new FileInputStream(path));
+        try (FileInputStream input = new FileInputStream(path)) {
+            propertyFile.load(input);
         } catch (IOException e) {
-            throw new RuntimeException(e.getMessage());
+            throw new IllegalStateException("Unable to load SQL config: " + path, e);
         }
 
-        agtySqlConfig.setDriver(propertyFile.getProperty(configSection + "driver", "mysql"));
-        agtySqlConfig.setServer(propertyFile.getProperty(configSection + "server", "localhost"));
-        agtySqlConfig.setPort(Integer.parseInt(propertyFile.getProperty(configSection + "port", "3306")));
-        agtySqlConfig.setUser(propertyFile.getProperty(configSection + "user", "root"));
-        agtySqlConfig.setPassword(propertyFile.getProperty(configSection + "password", "root"));
-        agtySqlConfig.setOwner(propertyFile.getProperty(configSection + "owner", agtySqlConfig.getUser()));
-        agtySqlConfig.setDatabase(propertyFile.getProperty(configSection + "database", agtySqlConfig.getDatabase()));
-        agtySqlConfig.setSchema(propertyFile.getProperty(configSection + "schema", agtySqlConfig.getSchema()));
-        agtySqlConfig.setPfx(propertyFile.getProperty(configSection + "pfx", ""));
-        agtySqlConfig.setEncoding(propertyFile.getProperty(configSection + "encoding", "UTF-8"));
-        agtySqlConfig.setTimeZone(propertyFile.getProperty(configSection + "serverTimeZone", "UTC"));
-        agtySqlConfig.setAutoCommit(Boolean.parseBoolean(propertyFile.getProperty(configSection + "autoCommit", "true")));
-        agtySqlConfig.setLogQuery(Boolean.parseBoolean(propertyFile.getProperty(configSection + "logquery", "false")));
-        agtySqlConfig.setDebug(Boolean.parseBoolean(propertyFile.getProperty(configSection + "debug", "false")));
-        agtySqlConfig.setThrowException(Boolean.parseBoolean(propertyFile.getProperty(configSection + "throwException", "false")));
-        agtySqlConfig.setNoRequery(Boolean.parseBoolean(propertyFile.getProperty(configSection + "noRequery", "false")));
-        agtySqlConfig.setStmtRows(Integer.parseInt(propertyFile.getProperty(configSection + "stmtRows", "100")));
+        agtySqlConfig.setDriver(getProperty(propertyFile, configSection + "driver", "mysql"));
+        agtySqlConfig.setServer(getProperty(propertyFile, configSection + "server", "localhost"));
+        agtySqlConfig.setPort(Integer.parseInt(getProperty(propertyFile, configSection + "port", "3306")));
+        agtySqlConfig.setUser(getProperty(propertyFile, configSection + "user", null));
+        agtySqlConfig.setPassword(getProperty(propertyFile, configSection + "password", null));
+        agtySqlConfig.setOwner(getProperty(propertyFile, configSection + "owner", agtySqlConfig.getUser()));
+        agtySqlConfig.setDatabase(getProperty(propertyFile, configSection + "database", agtySqlConfig.getDatabase()));
+        agtySqlConfig.setSchema(getProperty(propertyFile, configSection + "schema", agtySqlConfig.getSchema()));
+        agtySqlConfig.setPfx(getProperty(propertyFile, configSection + "pfx", ""));
+        agtySqlConfig.setEncoding(getProperty(propertyFile, configSection + "encoding", "UTF-8"));
+        agtySqlConfig.setTimeZone(getProperty(propertyFile, configSection + "serverTimeZone", "UTC"));
+        agtySqlConfig.setAutoCommit(Boolean.parseBoolean(
+                getProperty(propertyFile, configSection + "autoCommit", "true")
+        ));
+        agtySqlConfig.setTrustServerCertificate(Boolean.parseBoolean(
+                getProperty(propertyFile, configSection + "trustServerCertificate", "false")
+        ));
+        agtySqlConfig.setLogQuery(Boolean.parseBoolean(
+                getProperty(propertyFile, configSection + "logquery", "false")
+        ));
+        agtySqlConfig.setLogQueryValues(Boolean.parseBoolean(
+                getProperty(propertyFile, configSection + "logQueryValues", "false")
+        ));
+        agtySqlConfig.setLogQueryFile(getProperty(propertyFile, configSection + "logQueryFile", null));
+        agtySqlConfig.setLogErrors(Boolean.parseBoolean(
+                getProperty(propertyFile, configSection + "logErrors", "false")
+        ));
+        agtySqlConfig.setLogErrorsFile(getProperty(propertyFile, configSection + "logErrorsFile", null));
+        agtySqlConfig.setDebug(Boolean.parseBoolean(
+                getProperty(propertyFile, configSection + "debug", "false")
+        ));
+        agtySqlConfig.setThrowException(Boolean.parseBoolean(
+                getProperty(propertyFile, configSection + "throwException", "true")
+        ));
+        agtySqlConfig.setNoRequery(Boolean.parseBoolean(
+                getProperty(propertyFile, configSection + "noRequery", "false")
+        ));
+        agtySqlConfig.setStmtRows(Integer.parseInt(
+                getProperty(propertyFile, configSection + "stmtRows", "100")
+        ));
+        agtySqlConfig.setLoginTimeoutSeconds(Integer.parseInt(
+                getProperty(propertyFile, configSection + "loginTimeoutSeconds", "0")
+        ));
+        agtySqlConfig.setNetworkTimeoutMillis(Integer.parseInt(
+                getProperty(propertyFile, configSection + "networkTimeoutMillis", "0")
+        ));
+    }
+
+    private String getProperty(Properties properties, String key, String defaultValue) {
+        return resolveValue(properties.getProperty(key, defaultValue));
+    }
+
+    private String resolveValue(String value) {
+        if (value == null) return null;
+        String trimmed = value.trim();
+        if (trimmed.startsWith("${") && trimmed.endsWith("}") && trimmed.length() > 3) {
+            String variable = trimmed.substring(2, trimmed.length() - 1);
+            return System.getenv(variable);
+        }
+        return value;
     }
 
     /**

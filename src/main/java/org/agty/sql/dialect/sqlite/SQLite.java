@@ -2,6 +2,7 @@ package org.agty.sql.dialect.sqlite;
 
 import org.agty.sql.AgtySQL;
 import org.agty.sql.data.Arguments;
+import org.agty.sql.data.SqlExpression;
 import org.agty.sql.driver.DialectCapabilities;
 import org.agty.sql.driver.LastInsertIdStrategy;
 import org.agty.sql.driver.UpdateAndGetStrategy;
@@ -37,7 +38,11 @@ public class SQLite extends MySQL {
     public boolean tableIsExists(String table) {
         SqlRow fetch = getAgtySQL().fetch(
                 new Arguments()
-                        .setQuery("SELECT name FROM sqlite_master WHERE type = 'table' AND name = '" + table + "' LIMIT 1")
+                        .useStatementPrepare(true)
+                        .setQuery(
+                                "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ? LIMIT 1",
+                                table
+                        )
                         .setNoRebuildQuery(true)
         );
         return fetch.isSet("name");
@@ -52,7 +57,7 @@ public class SQLite extends MySQL {
     public Long getLastInsertId(String table, String primaryKey) {
         SqlRow row = getAgtySQL().fetch(
                 new Arguments()
-                        .setQuery("SELECT last_insert_rowid() AS last_id")
+                        .setQuery(SqlExpression.trusted("SELECT last_insert_rowid() AS last_id"))
                         .setNoRebuildQuery(true)
         );
         return row.getLong("last_id");
@@ -71,7 +76,7 @@ public class SQLite extends MySQL {
                 }
             }
         } catch (java.sql.SQLException e) {
-            throw new org.agty.sql.exceptions.AgtySqlException("SQLite.getPrimaryKey()", e.getMessage());
+            throw new org.agty.sql.exceptions.AgtySqlException("SQLite.getPrimaryKey()", e.getMessage(), e);
         }
 
         return null;

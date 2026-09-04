@@ -10,12 +10,12 @@ public class Limit {
     public Limit() {}
 
     public Limit(int limit, int offset) {
-        setLimit(limit);
-        setOffset(offset);
+        this.limit = limit;
+        this.offset = offset;
     }
 
     public Limit(int limit) {
-        setLimit(limit);
+        this.limit = limit;
     }
 
     public Integer getOffset() {

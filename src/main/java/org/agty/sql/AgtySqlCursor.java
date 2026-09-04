@@ -8,21 +8,35 @@ import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.function.Consumer;
 
 /**
  * Forward-only cursor wrapper over JDBC ResultSet.
+ *
+ * <p>A cursor is stateful and not thread-safe. Consume and close it from one
+ * thread.</p>
  */
 public final class AgtySqlCursor implements AutoCloseable {
 
     private final ResultSet resultSet;
     private final Arguments arguments;
+    private final Consumer<AgtySqlCursor> closeCallback;
     private SqlRow bufferedRow;
     private boolean nextRowBuffered;
     private boolean closed;
 
     public AgtySqlCursor(ResultSet resultSet, Arguments arguments) {
+        this(resultSet, arguments, null);
+    }
+
+    AgtySqlCursor(
+            ResultSet resultSet,
+            Arguments arguments,
+            Consumer<AgtySqlCursor> closeCallback
+    ) {
         this.resultSet = resultSet;
         this.arguments = arguments;
+        this.closeCallback = closeCallback;
     }
 
     public ResultSet getResultSet() {
@@ -83,14 +97,23 @@ public final class AgtySqlCursor implements AutoCloseable {
             ResultSetMetaData metaData = resultSet.getMetaData();
             for (int i = 1; i <= metaData.getColumnCount(); ++i) {
                 row.setData(
-                        metaData.getColumnName(i),
+                        metaData.getColumnLabel(i),
                         arguments.convertValueToString() ? resultSet.getString(i) : resultSet.getObject(i)
                 );
             }
 
             return row;
         } catch (SQLException e) {
-            throw new org.agty.sql.exceptions.AgtySqlException("AgtySqlCursor.next()", e.getMessage());
+            try {
+                close();
+            } catch (RuntimeException closeException) {
+                e.addSuppressed(closeException);
+            }
+            throw new org.agty.sql.exceptions.AgtySqlException(
+                    "AgtySqlCursor.next()",
+                    e.getMessage(),
+                    e
+            );
         }
     }
 
@@ -130,9 +153,16 @@ public final class AgtySqlCursor implements AutoCloseable {
         }
 
         closed = true;
+        if (closeCallback != null) {
+            closeCallback.accept(this);
+        }
 
         if (exception != null) {
-            throw new org.agty.sql.exceptions.AgtySqlException("AgtySqlCursor.close()", exception.getMessage());
+            throw new org.agty.sql.exceptions.AgtySqlException(
+                    "AgtySqlCursor.close()",
+                    exception.getMessage(),
+                    exception
+            );
         }
     }
 }

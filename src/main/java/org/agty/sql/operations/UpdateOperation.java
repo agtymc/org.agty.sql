@@ -2,12 +2,16 @@ package org.agty.sql.operations;
 
 import org.agty.sql.AgtySqlOperationSupport;
 import org.agty.sql.data.Arguments;
+import org.agty.sql.data.SqlExpression;
 import org.agty.sql.driver.UpdateAndGetStrategy;
 import org.agty.sql.interfaces.SqlRow;
+import org.agty.sql.support.PreparedStatementSupport;
 import org.agty.sql.support.RowFactory;
+import org.agty.sql.support.SqlIdentifierValidator;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 
 public final class UpdateOperation {
 
@@ -23,7 +27,15 @@ public final class UpdateOperation {
                 : support.getDriverSqlObject().updateQuery(arguments);
 
         if (support.hasQuery(query)) {
-            support.executeUpdate(query);
+            if (arguments.useStatementPrepare()) {
+                support.executePreparedUpdate(
+                        query,
+                        PreparedStatementSupport.updateParameters(arguments),
+                        arguments.noRebuildQuery()
+                );
+            } else {
+                support.executeUpdate(query);
+            }
         } else {
             support.throwError("AgtySQL.update()", "No a query for UPDATE");
         }
@@ -32,6 +44,14 @@ public final class UpdateOperation {
     }
 
     public SqlRow updateAndGet(Arguments arguments, String fields) {
+        return updateAndGetValidated(arguments, SqlIdentifierValidator.requireFieldList(fields));
+    }
+
+    public SqlRow updateAndGet(Arguments arguments, SqlExpression fields) {
+        return updateAndGetValidated(arguments, requireExpression(fields, "RETURNING fields"));
+    }
+
+    private SqlRow updateAndGetValidated(Arguments arguments, String fields) {
         UpdateAndGetStrategy strategy = support.getDialectCapabilities().updateAndGetStrategy();
         if (!support.getDialectCapabilities().supportsUpdateAndGet()) {
             support.throwError(
@@ -59,13 +79,12 @@ public final class UpdateOperation {
     }
 
     private SqlRow updateAndGetReturning(Arguments arguments, String fields) {
-
         ResultSet resultSet = support.getDriverSqlObject().updateAndGet(arguments, fields);
-
-        try {
-            return support.getFetchRow(resultSet, arguments);
+        try (Statement statement = resultSet == null ? null : resultSet.getStatement();
+             ResultSet closeableResultSet = resultSet) {
+            return support.getFetchRow(closeableResultSet, arguments);
         } catch (SQLException e) {
-            support.throwError("AgtySQL.updateAndGet()", e.getMessage());
+            support.throwError("AgtySQL.updateAndGet()", e);
         }
 
         return RowFactory.emptyRow();
@@ -113,37 +132,50 @@ public final class UpdateOperation {
             return RowFactory.emptyRow();
         }
 
-        SqlRow row = support.fetch(
-                Arguments.builder()
-                        .setTable(arguments.getTable())
-                        .setPrimaryKey(arguments.getPrimaryKey())
-                        .setWhere(arguments.getWhere())
-                        .setHaving(arguments.getHaving())
-                        .setGroupBy(arguments.getGroupBy())
-                        .setOrderBy(arguments.getOrderBy())
-                        .setFields(fields)
-                        .setNoRebuildQuery(arguments.noRebuildQuery())
-        );
+        Arguments fetchArguments = Arguments.builder()
+                .useStatementPrepare(arguments.useStatementPrepare())
+                .setTable(arguments.getTable())
+                .setFields(SqlExpression.trusted(fields))
+                .setNoRebuildQuery(arguments.noRebuildQuery());
+
+        copyOptionalIdentifiers(arguments, fetchArguments);
+        copyQueryClauses(arguments, fetchArguments);
+
+        if (arguments.useStatementPrepare()) {
+            fetchArguments.setWhere(arguments.getWhere(), arguments.getWhereParameters().toArray());
+        } else {
+            fetchArguments.setWhere(SqlExpression.trusted(arguments.getWhere()));
+        }
+
+        SqlRow row = support.fetch(fetchArguments);
 
         return row == null ? RowFactory.emptyRow() : row;
     }
 
     private Arguments copyArguments(Arguments source) {
         Arguments copy = Arguments.builder()
+                .useStatementPrepare(source.useStatementPrepare())
                 .setTable(source.getTable())
-                .setActionField(source.getActionField())
-                .setPrimaryKey(source.getPrimaryKey())
-                .setWhere(source.getWhere())
-                .setHaving(source.getHaving())
-                .setGroupBy(source.getGroupBy())
-                .setOrderBy(source.getOrderBy())
-                .setFields(source.getFields())
-                .setQuery(source.getQuery())
                 .convertValueToString(source.convertValueToString())
                 .setEmulateMode(source.isEmulateMode())
                 .setNoStringEncode(source.noStringEncode())
                 .setNoRebuildQuery(source.noRebuildQuery())
                 .setForceRebuildQuery(source.forceRebuildQuery());
+
+        copyOptionalIdentifiers(source, copy);
+        copyQueryClauses(source, copy);
+        copy.setFields(SqlExpression.trusted(source.getFields()));
+
+        if (source.hasWhere() && source.useStatementPrepare()) {
+            copy.setWhere(source.getWhere(), source.getWhereParameters().toArray());
+        } else if (source.hasWhere()) {
+            copy.setWhere(SqlExpression.trusted(source.getWhere()));
+        }
+        if (source.hasQuery() && source.useStatementPrepare()) {
+            copy.setQuery(source.getQuery(), source.getQueryParameters().toArray());
+        } else if (source.hasQuery()) {
+            copy.setQuery(SqlExpression.trusted(source.getQuery()));
+        }
 
         source.getDataMap().forEach((key, value) -> putData(copy, key, value));
         source.getColumns().forEach(copy::addColumn);
@@ -156,27 +188,35 @@ public final class UpdateOperation {
         return copy;
     }
 
-    private void putData(Arguments arguments, String key, Object value) {
-        if (value == null) {
-            arguments.addData(key, (String) null);
-        } else if (value instanceof String stringValue) {
-            arguments.addData(key, stringValue);
-        } else if (value instanceof Integer integerValue) {
-            arguments.addData(key, integerValue);
-        } else if (value instanceof Long longValue) {
-            arguments.addData(key, longValue);
-        } else if (value instanceof Short shortValue) {
-            arguments.addData(key, shortValue);
-        } else if (value instanceof Boolean booleanValue) {
-            arguments.addData(key, booleanValue);
-        } else if (value instanceof Float floatValue) {
-            arguments.addData(key, floatValue);
-        } else if (value instanceof Double doubleValue) {
-            arguments.addData(key, doubleValue);
-        } else if (value instanceof Character characterValue) {
-            arguments.addData(key, characterValue);
-        } else {
-            arguments.addData(key, String.valueOf(value));
+    private void copyOptionalIdentifiers(Arguments source, Arguments target) {
+        if (source.hasActionField()) {
+            target.setActionField(source.getActionField());
         }
+        if (source.getPrimaryKey() != null && !source.getPrimaryKey().isBlank()) {
+            target.setPrimaryKey(source.getPrimaryKey());
+        }
+    }
+
+    private void copyQueryClauses(Arguments source, Arguments target) {
+        if (source.hasHaving()) {
+            target.setHaving(SqlExpression.trusted(source.getHaving()));
+        }
+        if (source.hasGroupBy()) {
+            target.setGroupBy(SqlExpression.trusted(source.getGroupBy()));
+        }
+        if (source.hasOrderBy()) {
+            target.setOrderBy(SqlExpression.trusted(source.getOrderBy()));
+        }
+    }
+
+    private String requireExpression(SqlExpression expression, String role) {
+        if (expression == null) {
+            throw new IllegalArgumentException(role + " expression must not be null");
+        }
+        return expression.sql();
+    }
+
+    private void putData(Arguments arguments, String key, Object value) {
+        arguments.addData(key, value);
     }
 }

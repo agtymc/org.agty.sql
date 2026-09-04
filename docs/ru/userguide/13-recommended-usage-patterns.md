@@ -25,3 +25,18 @@
 - избегать неявных предположений о `RETURNING`;
 - считать `insertAndGet()` и `updateAndGet()` capability-driven API;
 - фиксировать transaction boundaries явно.
+
+## Безопасная production-конфигурация
+
+- Один изменяемый экземпляр `AgtySQL`, `Arguments` или `AgtySqlCursor` должен
+  использоваться только в рамках одного запроса/транзакции и одного потока.
+  Пулы можно разделять между потоками, заимствованные handles нельзя.
+- Оставляйте `throwException=true`, чтобы ошибка соединения или выполнения не
+  выглядела как пустой результат SQL-запроса.
+- Настраивайте отдельно `loginTimeoutSeconds` и `networkTimeoutMillis`.
+- Оставляйте `logQueryValues=false`. Тогда в query log редактируются строковые,
+  числовые и dollar-quoted литералы; присваивания credentials редактируются
+  всегда.
+- Используйте `${ENVIRONMENT_VARIABLE}` как полное значение секрета в ini либо
+  создавайте `AgtySqlConfig` из результата secret manager. Локальный
+  `config.ini` ограничьте правами владельца: `chmod 600 config.ini`.

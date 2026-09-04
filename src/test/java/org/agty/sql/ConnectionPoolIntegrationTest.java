@@ -11,10 +11,17 @@ import org.junit.jupiter.api.Test;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.SQLException;
+import java.sql.Connection;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 class ConnectionPoolIntegrationTest {
 
@@ -83,6 +90,118 @@ class ConnectionPoolIntegrationTest {
         }
     }
 
+    @Test
+    void staleAndConcurrentCloseCannotReleaseAnotherLease() throws Exception {
+        AgtySQLPool pool = registerPool("lease-" + randomSuffix(), 1);
+        AgtySQLPool.PooledAgtySQL first = pool.borrow();
+        Connection firstConnection = first.sql().getConnection();
+        first.close();
+
+        AgtySQLPool.PooledAgtySQL current = pool.borrow();
+        first.close();
+        Assertions.assertThrows(
+                SQLException.class,
+                () -> pool.borrow(Duration.ofMillis(25))
+        );
+        Assertions.assertThrows(IllegalStateException.class, first::sql);
+        Assertions.assertTrue(firstConnection.isClosed());
+
+        ExecutorService executor = Executors.newFixedThreadPool(4);
+        CountDownLatch start = new CountDownLatch(1);
+        try {
+            List<Future<?>> closes = new ArrayList<>();
+            for (int index = 0; index < 4; index++) {
+                closes.add(executor.submit(() -> {
+                    start.await();
+                    current.close();
+                    return null;
+                }));
+            }
+            start.countDown();
+            for (Future<?> close : closes) {
+                close.get();
+            }
+        } finally {
+            executor.shutdownNow();
+        }
+
+        try (AgtySQLPool.PooledAgtySQL next = pool.borrow(Duration.ofMillis(100))) {
+            Assertions.assertFalse(next.sql().getConnection().isClosed());
+        }
+    }
+
+    @Test
+    void returnedLeaseRollsBackAndRestoresAutoCommit() throws Exception {
+        AgtySQLPool pool = registerPool("reset-" + randomSuffix(), 1);
+        try (AgtySQLPool.PooledAgtySQL setup = pool.borrow()) {
+            initializePoolTable(setup.sql(), "{pool_items}");
+        }
+
+        AgtySQLPool.PooledAgtySQL transaction = pool.borrow();
+        transaction.sql().setAutoCommit(false);
+        insertRow(transaction.sql(), "{pool_items}", 1L, "must-rollback");
+        transaction.close();
+
+        try (AgtySQLPool.PooledAgtySQL verification = pool.borrow()) {
+            Assertions.assertTrue(verification.sql().isAutoCommit());
+            Assertions.assertEquals(
+                    0L,
+                    verification.sql().countRows(Arguments.builder().setTable("{pool_items}"))
+            );
+        }
+    }
+
+    @Test
+    void closingPoolInvalidatesActiveLeaseAndBlocksPhysicalUnwrap() throws Exception {
+        AgtySQLPool pool = registerPool("close-" + randomSuffix(), 1);
+        AgtySQLPool.PooledAgtySQL lease = pool.borrow();
+        Connection connection = lease.sql().getConnection();
+
+        Assertions.assertThrows(SQLException.class, () -> connection.unwrap(org.h2.jdbc.JdbcConnection.class));
+        pool.close();
+
+        Assertions.assertTrue(connection.isClosed());
+        Assertions.assertThrows(IllegalStateException.class, lease::sql);
+        Assertions.assertThrows(IllegalStateException.class, pool::borrow);
+    }
+
+    @Test
+    void concurrentBorrowersNeverShareOneConnectionHandle() throws Exception {
+        AgtySQLPool pool = registerPool("stress-" + randomSuffix(), 4);
+        ExecutorService executor = Executors.newFixedThreadPool(12);
+        Set<Connection> activeConnections = ConcurrentHashMap.newKeySet();
+        CountDownLatch start = new CountDownLatch(1);
+        List<Future<?>> tasks = new ArrayList<>();
+
+        try {
+            for (int worker = 0; worker < 12; worker++) {
+                tasks.add(executor.submit(() -> {
+                    start.await();
+                    for (int iteration = 0; iteration < 40; iteration++) {
+                        try (AgtySQLPool.PooledAgtySQL lease = pool.borrow(Duration.ofSeconds(2))) {
+                            Connection connection = lease.sql().getConnection();
+                            Assertions.assertTrue(activeConnections.add(connection));
+                            try (var statement = connection.createStatement();
+                                 var resultSet = statement.executeQuery("SELECT 1")) {
+                                Assertions.assertTrue(resultSet.next());
+                            } finally {
+                                activeConnections.remove(connection);
+                            }
+                        }
+                    }
+                    return null;
+                }));
+            }
+            start.countDown();
+            for (Future<?> task : tasks) {
+                task.get();
+            }
+        } finally {
+            executor.shutdownNow();
+        }
+        Assertions.assertTrue(activeConnections.isEmpty());
+    }
+
     private AgtySQLPool registerPool(String poolName, int maxSize) {
         Path databasePath = Path.of("target", "test-pools", poolName);
         databasePaths.add(databasePath);
@@ -104,6 +223,10 @@ class ConnectionPoolIntegrationTest {
         );
 
         return ConnectionPool.get(poolName);
+    }
+
+    private String randomSuffix() {
+        return UUID.randomUUID().toString().replace("-", "");
     }
 
     private void initializePoolTable(AgtySQL sql, String table) {
