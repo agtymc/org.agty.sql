@@ -6,7 +6,7 @@
 
 ### Added
 - JaCoCo now enforces measured coverage floors for SQL builders, query rebuilding, arguments, row conversion, pools, and data sources.
-- Pull-request/push CI now verifies Java 21 and 25 on Linux and Windows, runs the six-database integration matrix separately, validates shell syntax, and pins third-party actions by commit SHA.
+- Pull-request/push CI now verifies Java 21 and 25 on Linux and Windows, runs the six-database integration matrix separately, validates shell syntax, and pins current third-party actions by commit SHA.
 - Maven release gates for Java/Maven versions, SpotBugs, PMD, JaCoCo reporting, source/Javadoc JARs, reproducible archive timestamps, and a checksum-verified Maven wrapper distribution.
 - Separate connection-login and established-network timeouts, `${ENV_VAR}` ini values, query-log value redaction, bounded UTF-8 log rotation, and a private vulnerability-reporting policy.
 - Opt-in high-level JDBC parameter binding through `Arguments.useStatementPrepare(true)`, including `?` parameters for `WHERE` and raw `setQuery(...)` SQL across CRUD, cursor, aggregate, generated-key, and write-return flows.
