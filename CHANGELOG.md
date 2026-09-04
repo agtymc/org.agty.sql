@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-## 2.1.0 - 2026-09-04
+## 2.1.0 - 2026-09-05
 
 ### Added
 - JaCoCo now enforces measured coverage floors for SQL builders, query rebuilding, arguments, row conversion, pools, and data sources.
