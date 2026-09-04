@@ -2,8 +2,8 @@ package org.agty.sql.base;
 
 /**
  * Сопоставимое поле AgtySQL с полем в драйвере SQL
- * agtySqlType "blob" <-> driverSqlType(MySQL) "BYTEA"
- * agtySqlType "varchar" <-> driverSqlType(PgSQL) "CHARACTER VARYING"
+ * {@code agtySqlType "blob" <-> driverSqlType(MySQL) "BYTEA"}
+ * {@code agtySqlType "varchar" <-> driverSqlType(PgSQL) "CHARACTER VARYING"}
  */
 public class Field {
     /**

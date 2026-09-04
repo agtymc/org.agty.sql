@@ -2,12 +2,14 @@ package org.agty.sql.dialect.mssql;
 
 import org.agty.sql.AgtySQL;
 import org.agty.sql.data.Arguments;
+import org.agty.sql.data.SqlExpression;
 import org.agty.sql.driver.DialectCapabilities;
 import org.agty.sql.driver.LastInsertIdStrategy;
 import org.agty.sql.driver.UpdateAndGetStrategy;
 import org.agty.sql.driver.WriteReturnStrategy;
 import org.agty.sql.dialect.mysql.MySQL;
 import org.agty.sql.interfaces.SqlRow;
+import org.agty.sql.support.PreparedStatementSupport;
 import org.agty.sql.support.SqlTextUtils;
 
 import java.sql.ResultSet;
@@ -73,7 +75,11 @@ public class MsSQL extends MySQL {
                 + " ("
                 + getInsertFields(arguments.getDataKeys())
                 + ") VALUES ("
-                + getInsertValues(arguments.getDataValues(), arguments.noStringEncode())
+                + getInsertValues(
+                        arguments.getDataValues(),
+                        arguments.noStringEncode(),
+                        arguments.useStatementPrepare()
+                )
                 + ")";
     }
 
@@ -117,7 +123,17 @@ public class MsSQL extends MySQL {
         String query = arguments.getQuery() != null && arguments.getQuery().length() >= 3
                 ? arguments.getQuery()
                 : insertQuery(arguments);
-        return getAgtySQL().executeResultSet(insertOutputClause(query, fields), arguments.noRebuildQuery());
+        String returningQuery = insertOutputClause(query, fields);
+        if (arguments.useStatementPrepare()) {
+            return PreparedStatementSupport.executeQuery(
+                    getAgtySQL(),
+                    returningQuery,
+                    PreparedStatementSupport.insertParameters(arguments),
+                    arguments.noRebuildQuery(),
+                    "MsSQL.insertAndGet()"
+            );
+        }
+        return getAgtySQL().executeResultSet(returningQuery, arguments.noRebuildQuery());
     }
 
     @Override
@@ -125,7 +141,17 @@ public class MsSQL extends MySQL {
         String query = arguments.getQuery() != null && arguments.getQuery().length() >= 3
                 ? arguments.getQuery()
                 : updateQuery(arguments);
-        return getAgtySQL().executeResultSet(updateOutputClause(query, fields), arguments.noRebuildQuery());
+        String returningQuery = updateOutputClause(query, fields);
+        if (arguments.useStatementPrepare()) {
+            return PreparedStatementSupport.executeQuery(
+                    getAgtySQL(),
+                    returningQuery,
+                    PreparedStatementSupport.updateParameters(arguments),
+                    arguments.noRebuildQuery(),
+                    "MsSQL.updateAndGet()"
+            );
+        }
+        return getAgtySQL().executeResultSet(returningQuery, arguments.noRebuildQuery());
     }
 
     @Override
@@ -134,12 +160,12 @@ public class MsSQL extends MySQL {
         String normalizedTable = getAgtySQL().rebuildTable(table);
         SqlRow fetch = getAgtySQL().fetch(
                 new Arguments()
+                        .useStatementPrepare(true)
                         .setQuery(
-                                "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = '"
-                                        + normalizedSchema
-                                        + "' AND TABLE_NAME = '"
-                                        + normalizedTable
-                                        + "'"
+                                "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES "
+                                        + "WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?",
+                                normalizedSchema,
+                                normalizedTable
                         )
                         .setNoRebuildQuery(true)
         );
@@ -168,9 +194,7 @@ public class MsSQL extends MySQL {
         query.append(") THEN 1 ELSE 0 END AS is_exists");
 
         SqlRow row = getAgtySQL().fetch(
-                new Arguments()
-                        .setQuery(query.toString())
-                        .setNoRebuildQuery(arguments.noRebuildQuery())
+                PreparedStatementSupport.readQueryArguments(arguments, query.toString())
         );
 
         return row.getInt("is_exists") == 1;
@@ -212,7 +236,9 @@ public class MsSQL extends MySQL {
     public Long getLastInsertId(String table, String primaryKey) {
         SqlRow row = getAgtySQL().fetch(
                 new Arguments()
-                        .setQuery("SELECT CAST(SCOPE_IDENTITY() AS BIGINT) AS last_id")
+                        .setQuery(SqlExpression.trusted(
+                                "SELECT CAST(SCOPE_IDENTITY() AS BIGINT) AS last_id"
+                        ))
                         .setNoRebuildQuery(true)
         );
         return row.getLong("last_id");
@@ -242,7 +268,7 @@ public class MsSQL extends MySQL {
                 }
             }
         } catch (SQLException e) {
-            throw new org.agty.sql.exceptions.AgtySqlException("MsSQL.getPrimaryKey()", e.getMessage());
+            throw new org.agty.sql.exceptions.AgtySqlException("MsSQL.getPrimaryKey()", e.getMessage(), e);
         }
 
         return null;
@@ -326,11 +352,15 @@ public class MsSQL extends MySQL {
         return fields.isEmpty() ? null : fields.toString();
     }
 
-    private String getInsertValues(List<Object> valuesArray, boolean noStringEncode) {
+    private String getInsertValues(
+            List<Object> valuesArray,
+            boolean noStringEncode,
+            boolean statementPrepare
+    ) {
         StringBuilder values = new StringBuilder();
 
         for (Object value : valuesArray) {
-            values.append(renderValue(value, noStringEncode));
+            values.append(renderValue(value, noStringEncode, statementPrepare));
             values.append(",");
         }
 
@@ -351,7 +381,11 @@ public class MsSQL extends MySQL {
             updateData.append(key);
             updateData.append(getQuoteColumn());
             updateData.append('=');
-            updateData.append(renderValue(arguments.getData(key), arguments.noStringEncode()));
+            updateData.append(renderValue(
+                    arguments.getData(key),
+                    arguments.noStringEncode(),
+                    arguments.useStatementPrepare()
+            ));
             updateData.append(",");
         }
 
@@ -364,11 +398,14 @@ public class MsSQL extends MySQL {
         return updateData.toString();
     }
 
-    private String renderValue(Object value, boolean noStringEncode) {
+    private String renderValue(Object value, boolean noStringEncode, boolean statementPrepare) {
+        if (statementPrepare) {
+            return "?";
+        }
         if (value == null || value.toString().isEmpty()) {
             return "NULL";
         }
-        if (value instanceof Integer || value instanceof Long || value instanceof Short) {
+        if (value instanceof Number) {
             return value.toString();
         }
         if (value instanceof Boolean booleanValue) {

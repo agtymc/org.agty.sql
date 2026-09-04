@@ -1,5 +1,21 @@
 # 05. High-Level CRUD
 
+Все CRUD-операции через `Arguments` поддерживают opt-in prepared-режим:
+
+```java
+SqlRow user = sql.fetch(
+        Arguments.builder()
+                .useStatementPrepare(true)
+                .setTable("{users}")
+                .setWhere("[email] = ?", email)
+);
+```
+
+Тот же режим действует для `fetch`, list/cursor-чтения, `rowIsExists`,
+`countRows`, `min/max`, insert, update, delete, generated ID и
+`insertAndGet/updateAndGet`. Правила привязки и legacy-совместимость описаны в
+разделе про `Arguments`.
+
 ### Fetch одной строки
 
 ```java

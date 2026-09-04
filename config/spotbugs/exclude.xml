@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter>
+    <!-- Mutable facade collaborators and JDBC handles are intentionally shared by reference. -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+    </Match>
+
+    <!-- These constructors validate before publication; none of the classes define finalizers. -->
+    <Match>
+        <Bug pattern="CT_CONSTRUCTOR_THROW"/>
+    </Match>
+
+    <!-- SqlRow explicitly models an absent nullable Boolean as null. -->
+    <Match>
+        <Or>
+            <Class name="org.agty.sql.base.RowData"/>
+            <Class name="org.agty.sql.base.RowDataEmpty"/>
+            <Class name="org.agty.sql.dialect.emptysql.EmptySQL"/>
+        </Or>
+        <Bug pattern="NP_BOOLEAN_RETURN_NULL"/>
+    </Match>
+
+    <!-- Public fields remain only for documented binary/source compatibility in 2.x. -->
+    <Match>
+        <Or>
+            <Field name="lastQuery"/>
+            <Field name="table"/>
+        </Or>
+        <Bug pattern="PA_PUBLIC_PRIMITIVE_ATTRIBUTE"/>
+    </Match>
+
+    <!-- Compatibility alias intentionally preserves the historical package/class name. -->
+    <Match>
+        <Class name="org.agty.sql.connect.AgtySqlConnector"/>
+        <Bug pattern="NM_SAME_SIMPLE_NAME_AS_SUPERCLASS"/>
+    </Match>
+</FindBugsFilter>

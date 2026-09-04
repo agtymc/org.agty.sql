@@ -34,8 +34,8 @@ If you need the library not only as an `AgtySQL` facade but also as a JDBC
   a basic non-pooled `DataSource` that creates raw JDBC connections from
   `AgtySqlConfig`;
 - `AgtySqlPooledDataSource`:
-  a pooled `DataSource` that can be used as an application-level bean instead
-  of `HikariDataSource`.
+  a HikariCP-backed pooled `DataSource` compatibility adapter that can be used
+  as an application-level bean.
 
 Basic example:
 
@@ -142,7 +142,8 @@ try (AgtySQLPool.PooledAgtySQL borrowed = pool.borrow()) {
     SqlRow row = sql.fetch(
             Arguments.builder()
                     .setTable("{users}")
-                    .setWhere("[id] = %d", 1)
+                    .useStatementPrepare(true)
+                    .setWhere("[id] = ?", 1)
     );
 }
 ```
@@ -150,7 +151,9 @@ try (AgtySQLPool.PooledAgtySQL borrowed = pool.borrow()) {
 Notes:
 
 - `AgtySQLPool` returns a ready `AgtySQL`, not a `Connection`;
-- `borrowed.close()` returns the session back to the pool;
+- each borrow creates a one-use lease and facade; `borrowed.close()` closes
+  that lease and returns its JDBC connection to HikariCP;
+- a closed `PooledAgtySQL` must not be reused;
 - this is a session-level facade pool, not a Spring JDBC `DataSource`;
 - for a Spring Boot `DataSource` bean, use `AgtySqlPooledDataSource`, not
   `AgtySQLPool`.
@@ -161,7 +164,8 @@ Notes:
 SqlRow row = sql.fetch(
         Arguments.builder()
                 .setTable("{users}")
-                .setWhere("[id] = %d", 1)
+                .useStatementPrepare(true)
+                .setWhere("[id] = ?", 1)
 );
 ```
 
@@ -171,8 +175,9 @@ SqlRow row = sql.fetch(
 sql.insert(
         Arguments.builder()
                 .setTable("{users}")
-                .addData("name", "Alex")
-                .addData("age", 30)
+                .useStatementPrepare(true)
+                .addDataString("name", "Alex")
+                .addDataInt("age", 30)
 );
 ```
 
@@ -182,10 +187,11 @@ sql.insert(
 AgtySQL sql = new AgtySQL("mysql");
 
 try {
-    SqlRow row = sql.fetch(
+        SqlRow row = sql.fetch(
             Arguments.builder()
                     .setTable("{users}")
-                    .setWhere("[id] = %d", 1)
+                    .useStatementPrepare(true)
+                    .setWhere("[id] = ?", 1)
     );
 } finally {
     sql.close();
@@ -206,6 +212,17 @@ High-level methods close their temporary JDBC resources automatically, but the
 
 - the application borrows `PooledAgtySQL` through `pool.borrow()`;
 - it then gets `AgtySQL` via `borrowed.sql()`;
-- `PooledAgtySQL.close()` returns the facade/session back to the pool;
+- `PooledAgtySQL.close()` invalidates that facade and returns only its JDBC
+  connection to HikariCP;
 - this is suitable for application code around the library, but it does not
   replace a standard Spring JDBC `DataSource` bean.
+
+### SQL Server TLS
+
+SQL Server connections always use encryption and validate the server
+certificate by default. Keep `trustServerCertificate` unset or `false` in
+production. Only local development with a self-signed certificate should use:
+
+```java
+config.setTrustServerCertificate(true);
+```

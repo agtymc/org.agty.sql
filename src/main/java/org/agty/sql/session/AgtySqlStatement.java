@@ -50,11 +50,11 @@ public class AgtySqlStatement {
     }
 
     private void createStatement() throws SQLException {
-        stmt = getConnection().createStatement(
+        stmt = connection.createStatement(
                 ResultSet.TYPE_FORWARD_ONLY,
                 ResultSet.CONCUR_READ_ONLY
         );
 
-        stmt.setFetchSize(getFetchSize() > 0 ? getFetchSize() : getStmtRows());
+        stmt.setFetchSize(fetchSize > 0 ? fetchSize : stmtRows);
     }
 }

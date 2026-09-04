@@ -7,7 +7,7 @@ public class AgtySqlConfig {
     private String driver = "mysql";
     private String server = "localhost";
     private int port = 3306;
-    private String user = "root";
+    private String user;
     private String password;
     private String owner;
     private String database;
@@ -16,14 +16,18 @@ public class AgtySqlConfig {
     private String encoding = "UTF-8";
     private String timeZone = "UTC";
     private boolean autoCommit = true;
+    private boolean trustServerCertificate = false;
     private boolean logQuery = false;
+    private boolean logQueryValues = false;
     private String logQueryFile;
     private boolean logErrors = false;
     private String logErrorsFile;
     private boolean debug = false;
-    private boolean throwException = false;
+    private boolean throwException = true;
     private boolean noRequery = false;
     private int stmtRows;
+    private int loginTimeoutSeconds;
+    private int networkTimeoutMillis;
     
     public AgtySqlConfig() {}
 
@@ -46,14 +50,18 @@ public class AgtySqlConfig {
                     .setEncoding(agtySqlConfig.getEncoding())
                     .setTimeZone(agtySqlConfig.getTimeZone())
                     .setAutoCommit(agtySqlConfig.isAutoCommit())
+                    .setTrustServerCertificate(agtySqlConfig.isTrustServerCertificate())
                     .setLogQuery(agtySqlConfig.isLogQuery())
+                    .setLogQueryValues(agtySqlConfig.isLogQueryValues())
                     .setLogQueryFile(agtySqlConfig.getLogQueryFile())
                     .setLogErrors(agtySqlConfig.isLogErrors())
                     .setLogErrorsFile(agtySqlConfig.getLogErrorsFile())
                     .setDebug(agtySqlConfig.isDebug())
                     .setThrowException(agtySqlConfig.isThrowException())
                     .setNoRequery(agtySqlConfig.noRequery())
-                    .setStmtRows(agtySqlConfig.getStmtRows());
+                    .setStmtRows(agtySqlConfig.getStmtRows())
+                    .setLoginTimeoutSeconds(agtySqlConfig.getLoginTimeoutSeconds())
+                    .setNetworkTimeoutMillis(agtySqlConfig.getNetworkTimeoutMillis());
     }
 
     /**
@@ -175,6 +183,25 @@ public class AgtySqlConfig {
         return this;
     }
 
+    /**
+     * Whether SQL Server may trust a certificate without validating its chain
+     * and host name. Disabled by default; enable only for isolated development.
+     */
+    public boolean isTrustServerCertificate() {
+        return trustServerCertificate;
+    }
+
+    /**
+     * Enables an insecure SQL Server development override.
+     *
+     * @param trustServerCertificate {@code true} to skip certificate validation
+     * @return current config
+     */
+    public AgtySqlConfig setTrustServerCertificate(boolean trustServerCertificate) {
+        this.trustServerCertificate = trustServerCertificate;
+        return this;
+    }
+
     public boolean isLogQuery() {
         return logQuery;
     }
@@ -184,12 +211,30 @@ public class AgtySqlConfig {
         return this;
     }
 
+    /**
+     * Whether query logs may contain literal values. Disabled by default.
+     */
+    public boolean isLogQueryValues() {
+        return logQueryValues;
+    }
+
+    /**
+     * Allows literal values in query logs. Do not enable for untrusted or personal data.
+     *
+     * @param logQueryValues whether values may be logged
+     * @return current config
+     */
+    public AgtySqlConfig setLogQueryValues(boolean logQueryValues) {
+        this.logQueryValues = logQueryValues;
+        return this;
+    }
+
     public String getLogErrorsFile() {
         return logErrorsFile;
     }
 
     public String getLogErrorsFileOrDefault(String logErrorsFile) {
-        return this.logErrorsFile.isEmpty() ? logErrorsFile : this.logErrorsFile;
+        return this.logErrorsFile == null || this.logErrorsFile.isBlank() ? logErrorsFile : this.logErrorsFile;
     }
 
     public AgtySqlConfig setLogErrorsFile(String logErrorsFile) {
@@ -202,7 +247,7 @@ public class AgtySqlConfig {
     }
 
     public String getLogQueryFileOrDefault(String logQueryFile) {
-        return this.logQueryFile.isEmpty() ? logQueryFile : this.logQueryFile;
+        return this.logQueryFile == null || this.logQueryFile.isBlank() ? logQueryFile : this.logQueryFile;
     }
 
     public AgtySqlConfig setLogQueryFile(String logQueryFile) {
@@ -252,6 +297,32 @@ public class AgtySqlConfig {
 
     public AgtySqlConfig setNoRequery(boolean noRequery) {
         this.noRequery = noRequery;
+        return this;
+    }
+
+    /** Maximum time allowed to establish a connection, in seconds. Zero uses the driver default. */
+    public int getLoginTimeoutSeconds() {
+        return loginTimeoutSeconds;
+    }
+
+    public AgtySqlConfig setLoginTimeoutSeconds(int loginTimeoutSeconds) {
+        if (loginTimeoutSeconds < 0) {
+            throw new IllegalArgumentException("Login timeout must not be negative");
+        }
+        this.loginTimeoutSeconds = loginTimeoutSeconds;
+        return this;
+    }
+
+    /** Maximum time for an established connection's network operations, in milliseconds. */
+    public int getNetworkTimeoutMillis() {
+        return networkTimeoutMillis;
+    }
+
+    public AgtySqlConfig setNetworkTimeoutMillis(int networkTimeoutMillis) {
+        if (networkTimeoutMillis < 0) {
+            throw new IllegalArgumentException("Network timeout must not be negative");
+        }
+        this.networkTimeoutMillis = networkTimeoutMillis;
         return this;
     }
 }

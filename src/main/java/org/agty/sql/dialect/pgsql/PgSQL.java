@@ -11,7 +11,8 @@ import org.agty.sql.interfaces.SqlRow;
 import org.agty.sql.AgtySQL;
 import org.agty.sql.interfaces.Sql;
 import org.agty.sql.sqlbuilder.QuerySelectBuilder;
-import org.agty.sql.sqlbuilder.QueryValueDataBuilder;
+import org.agty.sql.sqlbuilder.SqlValueRenderer;
+import org.agty.sql.support.PreparedStatementSupport;
 
 import java.sql.ResultSet;
 import java.util.*;
@@ -21,12 +22,12 @@ import java.util.*;
  */
 public class PgSQL implements Sql {
     private final AgtySQL agtySQL;
-    private final String DRIVER = "postgresql";
-    private final String DEFAULT_DATABASE = "template1";
-    private final String QUOTE_TABLE = "\"";
-    private final String QUOTE_COLUMN = "\"";
-    private final String QUOTE_VALUE = "'";
-    private final boolean SUPPORT_LARGE_UPDATE = true;
+    private static final String DRIVER = "postgresql";
+    private static final String DEFAULT_DATABASE = "template1";
+    private static final String QUOTE_TABLE = "\"";
+    private static final String QUOTE_COLUMN = "\"";
+    private static final String QUOTE_VALUE = "'";
+    private static final boolean SUPPORT_LARGE_UPDATE = true;
 
     /**
      * Constructor.
@@ -282,7 +283,7 @@ public class PgSQL implements Sql {
         query.append(") AS is_exists");
 
         SqlRow getData = getAgtySQL().fetch(
-                query.toString()
+                PreparedStatementSupport.readQueryArguments(arguments, query.toString())
         );
 
         return getData.getBoolean("is_exists");
@@ -414,7 +415,9 @@ public class PgSQL implements Sql {
 
         if (query == null) return null;
 
-        SqlRow getData = getAgtySQL().fetch(query);
+        SqlRow getData = getAgtySQL().fetch(
+                PreparedStatementSupport.readQueryArguments(arguments, query)
+        );
 
         return getData.getLong("M");
     }
@@ -431,7 +434,9 @@ public class PgSQL implements Sql {
 
         if (query == null) return null;
 
-        SqlRow getData = getAgtySQL().fetch(query);
+        SqlRow getData = getAgtySQL().fetch(
+                PreparedStatementSupport.readQueryArguments(arguments, query)
+        );
 
         return getData.getLong("M");
     }
@@ -466,6 +471,15 @@ public class PgSQL implements Sql {
     @Override
     public ResultSet insertAndGet(Arguments arguments, String fields) {
         String query = arguments.getQuery() != null && arguments.getQuery().length() >= 3 ? arguments.getQuery() : insertQuery(arguments);
+        if (arguments.useStatementPrepare()) {
+            return PreparedStatementSupport.executeQuery(
+                    getAgtySQL(),
+                    query + " RETURNING " + fields,
+                    PreparedStatementSupport.insertParameters(arguments),
+                    arguments.noRebuildQuery(),
+                    "PgSQL.insertAndGet()"
+            );
+        }
         return getAgtySQL().executeResultSet(query + " RETURNING " + fields, arguments.noRebuildQuery());
     }
 
@@ -479,6 +493,15 @@ public class PgSQL implements Sql {
     @Override
     public ResultSet updateAndGet(Arguments arguments, String fields) {
         String query = arguments.getQuery() != null && arguments.getQuery().length() >= 3 ? arguments.getQuery() : updateQuery(arguments);
+        if (arguments.useStatementPrepare()) {
+            return PreparedStatementSupport.executeQuery(
+                    getAgtySQL(),
+                    query + " RETURNING " + fields,
+                    PreparedStatementSupport.updateParameters(arguments),
+                    arguments.noRebuildQuery(),
+                    "PgSQL.updateAndGet()"
+            );
+        }
         return getAgtySQL().executeResultSet(query + " RETURNING " + fields, arguments.noRebuildQuery());
     }
 
@@ -502,7 +525,11 @@ public class PgSQL implements Sql {
         InsertData insertData = new InsertData();
         insertData.setArguments(arguments);
         insertData.setFields(getInsertFields(arguments.getDataKeys()));
-        insertData.setValue(getInsertValues(arguments.getDataValues(), arguments.noStringEncode()));
+        insertData.setValue(getInsertValues(
+                arguments.getDataValues(),
+                arguments.noStringEncode(),
+                arguments.useStatementPrepare()
+        ));
 
         return insertData;
     }
@@ -521,7 +548,8 @@ public class PgSQL implements Sql {
             insertData.setValue(
                     getInsertValues(
                             arguments.getDataValues(),
-                            arguments.noStringEncode()
+                            arguments.noStringEncode(),
+                            arguments.useStatementPrepare()
                     )
             );
         }
@@ -562,19 +590,24 @@ public class PgSQL implements Sql {
      * @param noStringEncode если true, тогда спецсимволы не будут преобразованы.
      * @return строка параметров.
      */
-    private String getInsertValues(List<Object> valuesArray, boolean noStringEncode) {
+    private String getInsertValues(
+            List<Object> valuesArray,
+            boolean noStringEncode,
+            boolean statementPrepare
+    ) {
 
         StringBuilder values = new StringBuilder();
 
         //'value'
         for (Object value : valuesArray) {
             values.append(
-                new QueryValueDataBuilder()
+                new SqlValueRenderer()
                         .setQuoteColumn(getQuoteColumn())
                         .setQuoteValue(getQuoteValue())
                         .setValue(value)
                         .setNoStringEncode(noStringEncode)
-                        .build()
+                        .useStatementPrepare(statementPrepare)
+                        .render()
             );
 
             values.append(",");
@@ -604,13 +637,14 @@ public class PgSQL implements Sql {
 
             //"key"=value
             returnData.append(
-                new QueryValueDataBuilder()
+                new SqlValueRenderer()
                         .setQuoteColumn(getQuoteColumn())
                         .setQuoteValue(getQuoteValue())
                         .setColumn(key)
                         .setValue(arguments.getData(key))
                         .setNoStringEncode(arguments.noStringEncode())
-                        .build()
+                        .useStatementPrepare(arguments.useStatementPrepare())
+                        .render()
             );
 
             returnData.append(",");

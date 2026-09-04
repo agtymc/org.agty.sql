@@ -24,7 +24,7 @@ public class SqlQuery<T> {
         return (T) this;
     }
 
-    protected void setArguments(Arguments arguments) {
+    protected final void setArguments(Arguments arguments) {
         if (!hasArguments()) {
             this.arguments = arguments;
         }

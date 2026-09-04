@@ -1,6 +1,7 @@
 package org.agty.sql;
 
 import org.agty.sql.data.Arguments;
+import org.agty.sql.data.SqlExpression;
 import org.agty.sql.exceptions.AgtySqlException;
 import org.agty.sql.interfaces.SqlRow;
 import org.agty.sql.model.annotations.Column;
@@ -8,11 +9,13 @@ import org.agty.sql.model.annotations.Entity;
 import org.agty.sql.support.TestDatabaseProfile;
 import org.agty.sql.support.TestDatabaseProfiles;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import java.util.stream.Stream;
 
+@Tag("integration")
 class AgtySQLInsertCapabilitiesIntegrationTest {
 
     private static Stream<TestDatabaseProfile> profilesSupportingLastInsertId() {
@@ -77,6 +80,36 @@ class AgtySQLInsertCapabilitiesIntegrationTest {
         }
     }
 
+    @ParameterizedTest(name = "prepared lastInsertId: {0}")
+    @MethodSource("profilesSupportingLastInsertId")
+    void preparedInsertReturnsGeneratedId(TestDatabaseProfile profile) {
+        AgtySQL sql = profile.createSql();
+        String table = "{integration_prepared_auto_id_" + profile.server() + "}";
+        String value = "generated O'Reilly & <raw>";
+
+        try {
+            recreateAutoIdTable(sql, table, profile);
+
+            long insertedId = sql.insert(
+                    Arguments.builder()
+                            .useStatementPrepare(true)
+                            .setTable(table)
+                            .addData("string", value)
+                            .setReturnLastInsertId(true)
+            );
+
+            Assertions.assertTrue(insertedId >= 1L);
+            SqlRow fetched = sql.fetch(Arguments.builder()
+                    .useStatementPrepare(true)
+                    .setTable(table)
+                    .setWhere("[id] = ?", insertedId));
+            Assertions.assertEquals(value, fetched.getString("string"));
+        } finally {
+            dropTableQuietly(sql, table);
+            sql.close();
+        }
+    }
+
     @ParameterizedTest(name = "lastInsertId explicit primary key: {0}")
     @MethodSource("profilesSupportingLastInsertId")
     void insertReturnsExplicitPrimaryKeyWhenProvided(TestDatabaseProfile profile) {
@@ -127,6 +160,32 @@ class AgtySQLInsertCapabilitiesIntegrationTest {
 
             Assertions.assertTrue(inserted.getLong("id") >= 1L);
             Assertions.assertEquals("returning", inserted.getString("string"));
+        } finally {
+            dropTableQuietly(sql, table);
+            sql.close();
+        }
+    }
+
+    @ParameterizedTest(name = "prepared insertAndGet: {0}")
+    @MethodSource("profilesSupportingInsertAndGet")
+    void preparedInsertAndGetReturnsUnencodedRow(TestDatabaseProfile profile) {
+        AgtySQL sql = profile.createSql();
+        String table = "{integration_prepared_insert_and_get_" + profile.server() + "}";
+        String value = "returning O'Reilly & <raw>";
+
+        try {
+            recreateAutoIdTable(sql, table, profile);
+
+            SqlRow inserted = sql.insertAndGet(
+                    Arguments.builder()
+                            .useStatementPrepare(true)
+                            .setTable(table)
+                            .addData("string", value),
+                    "id, string"
+            );
+
+            Assertions.assertTrue(inserted.getLong("id") >= 1L);
+            Assertions.assertEquals(value, inserted.getString("string"));
         } finally {
             dropTableQuietly(sql, table);
             sql.close();
@@ -203,6 +262,34 @@ class AgtySQLInsertCapabilitiesIntegrationTest {
 
             Assertions.assertEquals(7L, updated.getLong("id"));
             Assertions.assertEquals("after", updated.getString("string"));
+        } finally {
+            dropTableQuietly(sql, table);
+            sql.close();
+        }
+    }
+
+    @ParameterizedTest(name = "prepared updateAndGet: {0}")
+    @MethodSource("profilesSupportingUpdateAndGet")
+    void preparedUpdateAndGetBindsSetAndWhereValues(TestDatabaseProfile profile) {
+        AgtySQL sql = profile.createSql();
+        String table = "{integration_prepared_update_and_get_" + profile.server() + "}";
+        String value = "after O'Reilly & <raw>";
+
+        try {
+            recreateTable(sql, table, profile);
+            insertSeedRow(sql, table, 17L, "before-prepared");
+
+            SqlRow updated = sql.updateAndGet(
+                    Arguments.builder()
+                            .useStatementPrepare(true)
+                            .setTable(table)
+                            .addData("string", value)
+                            .setWhere("[id] = ?", 17L),
+                    "id, string"
+            );
+
+            Assertions.assertEquals(17L, updated.getLong("id"));
+            Assertions.assertEquals(value, updated.getString("string"));
         } finally {
             dropTableQuietly(sql, table);
             sql.close();
@@ -323,7 +410,7 @@ class AgtySQLInsertCapabilitiesIntegrationTest {
                     Arguments.builder()
                             .setTable(table)
                             .addData("string", "after-multi")
-                            .setWhere("[id] IN (41, 42)"),
+                            .setWhere(SqlExpression.trusted("[id] IN (41, 42)")),
                     "id, string"
             );
 

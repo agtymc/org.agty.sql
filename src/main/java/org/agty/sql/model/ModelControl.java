@@ -26,7 +26,6 @@ public class ModelControl {
      * @param returnFields Return fields
      * @return New instance of an Entity
      * @param <T> Type of Entity
-     * @throws IllegalAccessException Exception
      */
     @SuppressWarnings("unchecked")
     public <T> T save(T object, AgtySQL agtySQL, SaveModelMode saveModelMode, String returnFields) {
@@ -50,7 +49,8 @@ public class ModelControl {
      * @param returnField Return field
      * @return Object
      * @param <T> Type of Entity
-     * @throws IllegalAccessException Exception
+     * @throws IllegalAccessException when reflected access is denied
+     * @throws InvocationTargetException when a reflected method fails
      */
     public <T> Object saveAndGetField(T object, AgtySQL agtySQL, SaveModelMode saveModelMode, String returnField) throws IllegalAccessException, InvocationTargetException {
         SqlRow sqlRow = saveModel(object, agtySQL, saveModelMode, returnField);
@@ -67,7 +67,6 @@ public class ModelControl {
      * @param returnFields Return fields
      * @return A SqlRow object (maybe empty)
      * @param <T> An @Entity class
-     * @throws IllegalAccessException Exception
      */
     public <T> SqlRow saveModel(T object, AgtySQL agtySQL, SaveModelMode saveModelMode, String returnFields) {
         ModelAttributes<?> model = new ModelAttributes<>(object).build();

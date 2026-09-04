@@ -2,6 +2,7 @@ package org.agty.sql.dialect.h2;
 
 import org.agty.sql.AgtySQL;
 import org.agty.sql.data.Arguments;
+import org.agty.sql.data.SqlExpression;
 import org.agty.sql.driver.DialectCapabilities;
 import org.agty.sql.driver.LastInsertIdStrategy;
 import org.agty.sql.driver.UpdateAndGetStrategy;
@@ -39,7 +40,11 @@ public class H2 extends MySQL {
     public boolean tableIsExists(String table) {
         SqlRow fetch = getAgtySQL().fetch(
                 new Arguments()
-                        .setQuery("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = UPPER('" + table + "') LIMIT 1")
+                        .useStatementPrepare(true)
+                        .setQuery(
+                                "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = UPPER(?) LIMIT 1",
+                                table
+                        )
                         .setNoRebuildQuery(true)
         );
         return fetch.isSet("TABLE_NAME");
@@ -49,7 +54,7 @@ public class H2 extends MySQL {
     public Long getLastInsertId(String table, String primaryKey) {
         SqlRow row = getAgtySQL().fetch(
                 new Arguments()
-                        .setQuery("CALL IDENTITY()")
+                        .setQuery(SqlExpression.trusted("CALL IDENTITY()"))
                         .setNoRebuildQuery(true)
         );
         return row.getLong("IDENTITY()");
@@ -77,7 +82,7 @@ public class H2 extends MySQL {
                 }
             }
         } catch (java.sql.SQLException e) {
-            throw new org.agty.sql.exceptions.AgtySqlException("H2.getPrimaryKey()", e.getMessage());
+            throw new org.agty.sql.exceptions.AgtySqlException("H2.getPrimaryKey()", e.getMessage(), e);
         }
 
         return null;

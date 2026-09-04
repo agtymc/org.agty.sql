@@ -11,14 +11,14 @@ public class ColumnEntity {
     public ColumnEntity() {}
 
     public ColumnEntity(String column, Object value) {
-        setColumn(column);
-        setValue(value);
+        this.column = column;
+        this.value = value;
     }
 
     public ColumnEntity(String column, String value, boolean columnIsId) {
-        setColumn(column);
-        setValue(value);
-        setColumnIsId(columnIsId);
+        this.column = column;
+        this.value = value;
+        this.columnIsId = columnIsId;
     }
 
     public String getColumn() {
@@ -50,7 +50,11 @@ public class ColumnEntity {
             return shortValue.longValue();
         }
 
-        return (long) value;
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+
+        throw new IllegalArgumentException("Column value is not numeric: " + value);
     }
 
     public String getStringValue() {

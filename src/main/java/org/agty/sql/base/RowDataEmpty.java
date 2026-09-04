@@ -21,7 +21,7 @@ public class RowDataEmpty implements SqlRow {
      */
     @Override
     public SqlRow convertFromArguments(Arguments arguments) {
-        return null;
+        return this;
     }
 
     @Override
@@ -133,7 +133,7 @@ public class RowDataEmpty implements SqlRow {
 
     @Override
     public Boolean getBoolean(String key) {
-        return false;
+        return null;
     }
 
     @Override
@@ -163,11 +163,11 @@ public class RowDataEmpty implements SqlRow {
 
     @Override
     public String getDateFormat(String key, String format) {
-        return "";
+        return null;
     }
 
     @Override
     public String toString() {
-        return null;
+        return "RowData {}";
     }
 }

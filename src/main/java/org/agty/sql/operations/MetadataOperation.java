@@ -38,7 +38,8 @@ public final class MetadataOperation {
 
     public Long maxOrDefault(Arguments arguments, long defaultValue) {
         Long max = max(arguments);
-        return max == null ? defaultValue : max;
+        if (max != null) return max;
+        return defaultValue;
     }
 
     public Long min(Arguments arguments) {
@@ -47,7 +48,8 @@ public final class MetadataOperation {
 
     public Long minOrDefault(Arguments arguments, long defaultValue) {
         Long min = min(arguments);
-        return min == null ? defaultValue : min;
+        if (min != null) return min;
+        return defaultValue;
     }
 
     public Long lastInsertId(Arguments arguments) {

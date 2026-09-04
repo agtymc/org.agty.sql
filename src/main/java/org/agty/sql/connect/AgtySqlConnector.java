@@ -2,6 +2,8 @@ package org.agty.sql.connect;
 
 import org.agty.sql.config.AgtySqlConfig;
 
+import java.sql.Connection;
+
 /**
  * @deprecated use {@link org.agty.sql.session.AgtySqlConnector}.
  */
@@ -22,5 +24,9 @@ public class AgtySqlConnector extends org.agty.sql.session.AgtySqlConnector {
 
     public AgtySqlConnector(AgtySqlConfig agtySqlConfig) {
         super(agtySqlConfig);
+    }
+
+    public AgtySqlConnector(AgtySqlConfig agtySqlConfig, Connection connection) {
+        super(agtySqlConfig, connection);
     }
 }

@@ -1,5 +1,8 @@
 package org.agty.sql.datasource;
 
+import com.zaxxer.hikari.HikariConfig;
+import com.zaxxer.hikari.HikariDataSource;
+import com.zaxxer.hikari.HikariPoolMXBean;
 import org.agty.sql.config.AgtySqlConfig;
 
 import javax.sql.DataSource;
@@ -12,36 +15,32 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.SQLFeatureNotSupportedException;
 import java.time.Duration;
-import java.util.ArrayDeque;
-import java.util.Deque;
-import java.util.HashSet;
 import java.util.Set;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Logger;
 
 /**
- * Connection-level pooled DataSource intended to be used as a Spring-style
- * application DataSource bean.
+ * Spring-style pooled DataSource compatibility adapter backed by HikariCP.
+ *
+ * <p>The data source is thread-safe. Each returned connection handle belongs to
+ * one borrower and must be closed after use.</p>
  */
 public final class AgtySqlPooledDataSource implements DataSource, AutoCloseable {
+    private static final AtomicLong POOL_SEQUENCE = new AtomicLong();
+    private static final long HIKARI_MIN_CONNECTION_TIMEOUT_MILLIS = 250L;
+    private static final long HIKARI_MIN_IDLE_TIMEOUT_MILLIS = 10_000L;
+    private static final long HIKARI_MIN_MAX_LIFETIME_MILLIS = 30_000L;
 
-    private final AgtySqlDataSource source;
+    private final AgtySqlConfig config;
+    private final DataSource source;
+    private final HikariDataSource dataSource;
     private final int maxPoolSize;
     private final int minIdle;
-    private final Duration connectionTimeout;
-    private final Duration idleTimeout;
-    private final Duration maxLifetime;
-
-    private final Object monitor = new Object();
-    private final Deque<PooledConnection> idleConnections = new ArrayDeque<>();
-    private final Set<PooledConnection> activeConnections = new HashSet<>();
-    private final ScheduledExecutorService housekeeper;
+    private final Set<GuardedConnectionHandler> activeHandles = ConcurrentHashMap.newKeySet();
     private final AtomicBoolean closed = new AtomicBoolean(false);
 
-    private volatile int totalConnections;
     private volatile PrintWriter logWriter;
     private volatile int loginTimeout;
 
@@ -54,7 +53,7 @@ public final class AgtySqlPooledDataSource implements DataSource, AutoCloseable 
             long maxLifetimeMillis
     ) {
         this(
-                new AgtySqlDataSource(config),
+                config,
                 maxPoolSize,
                 minIdle,
                 Duration.ofMillis(connectionTimeoutMillis),
@@ -72,7 +71,8 @@ public final class AgtySqlPooledDataSource implements DataSource, AutoCloseable 
             Duration maxLifetime
     ) {
         this(
-                new AgtySqlDataSource(config),
+                config,
+                config == null ? null : new AgtySqlDataSource(config),
                 maxPoolSize,
                 minIdle,
                 connectionTimeout,
@@ -81,51 +81,44 @@ public final class AgtySqlPooledDataSource implements DataSource, AutoCloseable 
         );
     }
 
-    private AgtySqlPooledDataSource(
-            AgtySqlDataSource source,
+    AgtySqlPooledDataSource(
+            AgtySqlConfig config,
+            DataSource source,
             int maxPoolSize,
             int minIdle,
             Duration connectionTimeout,
             Duration idleTimeout,
             Duration maxLifetime
     ) {
+        if (config == null) {
+            throw new IllegalArgumentException("AgtySqlConfig must not be null");
+        }
+        if (source == null) {
+            throw new IllegalArgumentException("DataSource must not be null");
+        }
         if (maxPoolSize < 1) {
             throw new IllegalArgumentException("maxPoolSize must be greater than zero");
         }
         if (minIdle < 0 || minIdle > maxPoolSize) {
             throw new IllegalArgumentException("minIdle must be between zero and maxPoolSize");
         }
-        if (connectionTimeout == null || connectionTimeout.isZero() || connectionTimeout.isNegative()) {
-            throw new IllegalArgumentException("connectionTimeout must be positive");
-        }
-        if (idleTimeout == null || idleTimeout.isZero() || idleTimeout.isNegative()) {
-            throw new IllegalArgumentException("idleTimeout must be positive");
-        }
-        if (maxLifetime == null || maxLifetime.isZero() || maxLifetime.isNegative()) {
-            throw new IllegalArgumentException("maxLifetime must be positive");
-        }
+        requirePositive(connectionTimeout, "connectionTimeout");
+        requirePositive(idleTimeout, "idleTimeout");
+        requirePositive(maxLifetime, "maxLifetime");
 
+        this.config = AgtySqlConfig.getClone(config);
         this.source = source;
         this.maxPoolSize = maxPoolSize;
         this.minIdle = minIdle;
-        this.connectionTimeout = connectionTimeout;
-        this.idleTimeout = idleTimeout;
-        this.maxLifetime = maxLifetime;
-
-        this.housekeeper = Executors.newSingleThreadScheduledExecutor(r -> {
-            Thread thread = new Thread(r, "AgtySqlPooledDataSource-Housekeeper");
-            thread.setDaemon(true);
-            return thread;
-        });
-
-        prefillMinIdle();
-
-        long housekeeperPeriodMillis = Math.max(250L, Math.min(idleTimeout.toMillis(), 1000L));
-        housekeeper.scheduleAtFixedRate(this::housekeep, housekeeperPeriodMillis, housekeeperPeriodMillis, TimeUnit.MILLISECONDS);
+        this.dataSource = new HikariDataSource(createHikariConfig(
+                connectionTimeout,
+                idleTimeout,
+                maxLifetime
+        ));
     }
 
     public AgtySqlConfig getConfig() {
-        return source.getConfig();
+        return AgtySqlConfig.getClone(config);
     }
 
     public int getMaxPoolSize() {
@@ -137,29 +130,42 @@ public final class AgtySqlPooledDataSource implements DataSource, AutoCloseable 
     }
 
     public int getTotalConnections() {
-        return totalConnections;
+        HikariPoolMXBean pool = dataSource.getHikariPoolMXBean();
+        return pool == null ? 0 : pool.getTotalConnections();
     }
 
     public int getIdleConnections() {
-        synchronized (monitor) {
-            return idleConnections.size();
-        }
+        HikariPoolMXBean pool = dataSource.getHikariPoolMXBean();
+        return pool == null ? 0 : pool.getIdleConnections();
     }
 
     public int getActiveConnections() {
-        synchronized (monitor) {
-            return activeConnections.size();
-        }
+        return activeHandles.size();
     }
 
     @Override
     public Connection getConnection() throws SQLException {
-        return borrowConnection();
+        ensureOpen();
+        Connection delegate = dataSource.getConnection();
+        if (closed.get()) {
+            delegate.close();
+            throw new SQLException("DataSource is closed");
+        }
+
+        GuardedConnectionHandler handler = new GuardedConnectionHandler(delegate);
+        activeHandles.add(handler);
+        if (closed.get()) {
+            handler.closeHandle();
+            throw new SQLException("DataSource is closed");
+        }
+        return handler.proxy();
     }
 
     @Override
     public Connection getConnection(String username, String password) throws SQLException {
-        throw new SQLFeatureNotSupportedException("Per-call credentials are not supported by AgtySqlPooledDataSource");
+        throw new SQLFeatureNotSupportedException(
+                "Per-call credentials are not supported by AgtySqlPooledDataSource"
+        );
     }
 
     @Override
@@ -169,14 +175,22 @@ public final class AgtySqlPooledDataSource implements DataSource, AutoCloseable 
 
     @Override
     public void setLogWriter(PrintWriter out) {
-        this.logWriter = out;
-        source.setLogWriter(out);
+        try {
+            dataSource.setLogWriter(out);
+            this.logWriter = out;
+        } catch (SQLException e) {
+            throw new IllegalStateException("Unable to configure the JDBC log writer", e);
+        }
     }
 
     @Override
     public void setLoginTimeout(int seconds) throws SQLException {
+        if (seconds < 0) {
+            throw new SQLException("Login timeout must not be negative");
+        }
         this.loginTimeout = seconds;
         source.setLoginTimeout(seconds);
+        dataSource.setLoginTimeout(seconds);
     }
 
     @Override
@@ -191,15 +205,15 @@ public final class AgtySqlPooledDataSource implements DataSource, AutoCloseable 
 
     @Override
     public <T> T unwrap(Class<T> iface) throws SQLException {
-        if (iface.isInstance(this)) {
+        if (iface != null && iface.isInstance(this)) {
             return iface.cast(this);
         }
-        throw new SQLException("Unsupported unwrap: " + iface.getName());
+        throw new SQLException("Unsupported unwrap: " + (iface == null ? "null" : iface.getName()));
     }
 
     @Override
     public boolean isWrapperFor(Class<?> iface) {
-        return iface.isInstance(this);
+        return iface != null && iface.isInstance(this);
     }
 
     @Override
@@ -207,315 +221,125 @@ public final class AgtySqlPooledDataSource implements DataSource, AutoCloseable 
         if (!closed.compareAndSet(false, true)) {
             return;
         }
+        for (GuardedConnectionHandler handle : Set.copyOf(activeHandles)) {
+            handle.closeHandle();
+        }
+        dataSource.close();
+    }
 
-        housekeeper.shutdownNow();
+    private HikariConfig createHikariConfig(
+            Duration connectionTimeout,
+            Duration idleTimeout,
+            Duration maxLifetime
+    ) {
+        HikariConfig hikari = new HikariConfig();
+        hikari.setPoolName("agty-sql-datasource-" + POOL_SEQUENCE.incrementAndGet());
+        hikari.setDataSource(source);
+        hikari.setMaximumPoolSize(maxPoolSize);
+        hikari.setMinimumIdle(minIdle);
+        hikari.setAutoCommit(config.isAutoCommit());
+        if (config.isSchema() && !config.getSchema().isBlank()) {
+            hikari.setSchema(config.getSchema());
+        }
+        hikari.setConnectionTimeout(Math.max(
+                HIKARI_MIN_CONNECTION_TIMEOUT_MILLIS,
+                connectionTimeout.toMillis()
+        ));
+        hikari.setIdleTimeout(Math.max(HIKARI_MIN_IDLE_TIMEOUT_MILLIS, idleTimeout.toMillis()));
+        hikari.setMaxLifetime(Math.max(HIKARI_MIN_MAX_LIFETIME_MILLIS, maxLifetime.toMillis()));
+        hikari.setInitializationFailTimeout(0);
+        return hikari;
+    }
 
-        synchronized (monitor) {
-            for (PooledConnection idle : idleConnections) {
-                closeQuietly(idle.physicalConnection);
-            }
-            idleConnections.clear();
-
-            for (PooledConnection active : activeConnections) {
-                active.markPoolClosed();
-            }
+    private void ensureOpen() throws SQLException {
+        if (closed.get()) {
+            throw new SQLException("DataSource is closed");
         }
     }
 
-    private Connection borrowConnection() throws SQLException {
-        long deadline = System.nanoTime() + connectionTimeout.toNanos();
-
-        while (true) {
-            PooledConnection pooled = tryBorrow();
-            if (pooled != null) {
-                return pooled.borrowHandle();
-            }
-
-            long remainingNanos = deadline - System.nanoTime();
-            if (remainingNanos <= 0) {
-                throw new SQLException("Connection timeout");
-            }
-
-            synchronized (monitor) {
-                if (closed.get()) {
-                    throw new SQLException("DataSource is closed");
-                }
-                try {
-                    TimeUnit.NANOSECONDS.timedWait(monitor, remainingNanos);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    throw new SQLException("Interrupted while waiting for a pooled connection", e);
-                }
-            }
+    private static void requirePositive(Duration value, String name) {
+        if (value == null || value.isZero() || value.isNegative()) {
+            throw new IllegalArgumentException(name + " must be positive");
         }
     }
 
-    private PooledConnection tryBorrow() throws SQLException {
-        PooledConnection pooled;
+    private final class GuardedConnectionHandler implements InvocationHandler {
+        private final Connection delegate;
+        private final AtomicBoolean closedHandle = new AtomicBoolean(false);
+        private final Connection proxy;
 
-        synchronized (monitor) {
-            if (closed.get()) {
-                throw new SQLException("DataSource is closed");
-            }
-
-            while ((pooled = idleConnections.pollFirst()) != null) {
-                if (shouldDiscard(pooled)) {
-                    destroyConnection(pooled);
-                    continue;
-                }
-
-                activeConnections.add(pooled);
-                pooled.inUse = true;
-                return pooled;
-            }
-
-            if (totalConnections >= maxPoolSize) {
-                return null;
-            }
-
-            totalConnections++;
-        }
-
-        try {
-            PooledConnection created = new PooledConnection(source.getConnection());
-            synchronized (monitor) {
-                if (closed.get()) {
-                    closeQuietly(created.physicalConnection);
-                    totalConnections--;
-                    throw new SQLException("DataSource is closed");
-                }
-                activeConnections.add(created);
-                created.inUse = true;
-            }
-            return created;
-        } catch (SQLException e) {
-            synchronized (monitor) {
-                totalConnections--;
-                monitor.notifyAll();
-            }
-            throw e;
-        }
-    }
-
-    private void returnConnection(PooledConnection pooled) {
-        synchronized (monitor) {
-            if (!activeConnections.remove(pooled)) {
-                return;
-            }
-
-            pooled.inUse = false;
-            pooled.lastReleasedAt = System.currentTimeMillis();
-
-            if (closed.get() || shouldDiscard(pooled) || !resetConnectionState(pooled.physicalConnection)) {
-                destroyConnection(pooled);
-            } else {
-                idleConnections.addLast(pooled);
-            }
-
-            monitor.notifyAll();
-        }
-    }
-
-    private void housekeep() {
-        synchronized (monitor) {
-            if (closed.get()) {
-                return;
-            }
-
-            while (!idleConnections.isEmpty()) {
-                PooledConnection pooled = idleConnections.peekFirst();
-                if (pooled == null) {
-                    break;
-                }
-
-                if (idleConnections.size() <= minIdle && !isExpiredByLifetime(pooled)) {
-                    break;
-                }
-
-                if (shouldDiscard(pooled)) {
-                    idleConnections.pollFirst();
-                    destroyConnection(pooled);
-                    continue;
-                }
-
-                break;
-            }
-        }
-
-        ensureMinIdle();
-    }
-
-    private void prefillMinIdle() {
-        ensureMinIdle();
-    }
-
-    private void ensureMinIdle() {
-        while (true) {
-            synchronized (monitor) {
-                if (closed.get()) {
-                    return;
-                }
-                if (idleConnections.size() >= minIdle || totalConnections >= maxPoolSize) {
-                    return;
-                }
-                totalConnections++;
-            }
-
-            try {
-                PooledConnection created = new PooledConnection(source.getConnection());
-                synchronized (monitor) {
-                    if (closed.get()) {
-                        closeQuietly(created.physicalConnection);
-                        totalConnections--;
-                        return;
-                    }
-                    idleConnections.addLast(created);
-                    monitor.notifyAll();
-                }
-            } catch (SQLException e) {
-                synchronized (monitor) {
-                    totalConnections--;
-                    monitor.notifyAll();
-                }
-                return;
-            }
-        }
-    }
-
-    private boolean shouldDiscard(PooledConnection pooled) {
-        return pooled.physicalConnection == null
-                || isExpiredByLifetime(pooled)
-                || isExpiredByIdle(pooled)
-                || !isConnectionHealthy(pooled.physicalConnection);
-    }
-
-    private boolean isExpiredByLifetime(PooledConnection pooled) {
-        return System.currentTimeMillis() - pooled.createdAt > maxLifetime.toMillis();
-    }
-
-    private boolean isExpiredByIdle(PooledConnection pooled) {
-        return System.currentTimeMillis() - pooled.lastReleasedAt > idleTimeout.toMillis();
-    }
-
-    private boolean isConnectionHealthy(Connection connection) {
-        try {
-            return !connection.isClosed() && connection.isValid(2);
-        } catch (SQLException e) {
-            return false;
-        }
-    }
-
-    private boolean resetConnectionState(Connection connection) {
-        try {
-            if (!connection.getAutoCommit()) {
-                connection.rollback();
-                connection.setAutoCommit(true);
-            }
-            if (connection.isReadOnly()) {
-                connection.setReadOnly(false);
-            }
-            connection.clearWarnings();
-            return true;
-        } catch (SQLException e) {
-            return false;
-        }
-    }
-
-    private void destroyConnection(PooledConnection pooled) {
-        closeQuietly(pooled.physicalConnection);
-        totalConnections--;
-    }
-
-    private void closeQuietly(Connection connection) {
-        if (connection == null) {
-            return;
-        }
-        try {
-            connection.close();
-        } catch (SQLException ignored) {
-        }
-    }
-
-    private final class PooledConnection {
-        private final Connection physicalConnection;
-        private final long createdAt = System.currentTimeMillis();
-        private volatile long lastReleasedAt = createdAt;
-        private volatile boolean inUse;
-        private volatile boolean poolClosed;
-
-        private PooledConnection(Connection physicalConnection) {
-            this.physicalConnection = physicalConnection;
-        }
-
-        private Connection borrowHandle() {
-            InvocationHandler handler = new PooledConnectionInvocationHandler(this);
-            return (Connection) Proxy.newProxyInstance(
+        private GuardedConnectionHandler(Connection delegate) {
+            this.delegate = delegate;
+            this.proxy = (Connection) Proxy.newProxyInstance(
                     Connection.class.getClassLoader(),
                     new Class<?>[]{Connection.class},
-                    handler
+                    this
             );
         }
 
-        private void markPoolClosed() {
-            poolClosed = true;
-        }
-    }
-
-    private final class PooledConnectionInvocationHandler implements InvocationHandler {
-        private final PooledConnection pooled;
-        private volatile boolean closedHandle;
-
-        private PooledConnectionInvocationHandler(PooledConnection pooled) {
-            this.pooled = pooled;
+        private Connection proxy() {
+            return proxy;
         }
 
         @Override
-        public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+        public Object invoke(Object proxyObject, Method method, Object[] args) throws Throwable {
             String methodName = method.getName();
-
             if ("close".equals(methodName)) {
-                if (!closedHandle) {
-                    closedHandle = true;
-                    returnConnection(pooled);
-                }
+                closeHandle();
                 return null;
             }
-
             if ("isClosed".equals(methodName)) {
-                return closedHandle || pooled.poolClosed || pooled.physicalConnection.isClosed();
+                return closedHandle.get() || closed.get() || delegate.isClosed();
             }
-
-            if ("unwrap".equals(methodName) && args != null && args.length == 1 && args[0] instanceof Class<?> target) {
-                if (target.isInstance(proxy)) {
-                    return proxy;
+            if ("unwrap".equals(methodName)) {
+                Class<?> target = unwrapTarget(args);
+                if (target.isInstance(proxyObject)) {
+                    return proxyObject;
                 }
-                return pooled.physicalConnection.unwrap(target);
+                throw new SQLException("Unwrapping a pooled physical connection is disabled");
             }
-
-            if ("isWrapperFor".equals(methodName) && args != null && args.length == 1 && args[0] instanceof Class<?> target) {
-                return target.isInstance(proxy) || pooled.physicalConnection.isWrapperFor(target);
+            if ("isWrapperFor".equals(methodName)) {
+                return unwrapTarget(args).isInstance(proxyObject);
             }
-
             if ("toString".equals(methodName)) {
-                return "AgtySqlPooledConnection[" + pooled.physicalConnection + "]";
+                return "AgtySqlPooledConnection[guarded]";
             }
-
             if ("hashCode".equals(methodName)) {
-                return System.identityHashCode(proxy);
+                return System.identityHashCode(proxyObject);
             }
-
             if ("equals".equals(methodName)) {
-                return proxy == (args == null ? null : args[0]);
+                return proxyObject == (args == null ? null : args[0]);
             }
-
-            if (closedHandle || pooled.poolClosed) {
+            if (closedHandle.get() || closed.get()) {
                 throw new SQLException("Connection handle is closed");
             }
 
             try {
-                return method.invoke(pooled.physicalConnection, args);
-            } catch (InvocationTargetException e) {
-                throw e.getCause();
+                return method.invoke(delegate, args);
+            } catch (InvocationTargetException exception) {
+                throw exception.getCause();
+            }
+        }
+
+        private Class<?> unwrapTarget(Object[] args) throws SQLException {
+            if (args == null || args.length != 1 || !(args[0] instanceof Class<?> target)) {
+                throw new SQLException("Invalid unwrap target");
+            }
+            return target;
+        }
+
+        private void closeHandle() {
+            if (!closedHandle.compareAndSet(false, true)) {
+                return;
+            }
+            activeHandles.remove(this);
+            try {
+                delegate.close();
+            } catch (SQLException exception) {
+                PrintWriter writer = logWriter;
+                if (writer != null) {
+                    exception.printStackTrace(writer);
+                }
             }
         }
     }

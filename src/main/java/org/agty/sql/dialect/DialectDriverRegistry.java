@@ -11,6 +11,8 @@ import org.agty.sql.dialect.sqlite.SQLite;
 import org.agty.sql.exceptions.SqlDriverNotFoundException;
 import org.agty.sql.interfaces.Sql;
 
+import java.util.Locale;
+
 /**
  * Internal registry for concrete dialect implementations.
  */
@@ -20,7 +22,7 @@ public final class DialectDriverRegistry {
     }
 
     public static Sql getDialect(String driver, AgtySQL agtySQL) {
-        switch (driver.toLowerCase()) {
+        switch (driver.toLowerCase(Locale.ROOT)) {
             case "mysql" -> {
                 return new MySQL(agtySQL);
             }

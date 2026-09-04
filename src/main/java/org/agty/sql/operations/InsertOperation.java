@@ -2,8 +2,11 @@ package org.agty.sql.operations;
 
 import org.agty.sql.AgtySqlOperationSupport;
 import org.agty.sql.data.Arguments;
+import org.agty.sql.data.SqlExpression;
 import org.agty.sql.interfaces.SqlRow;
+import org.agty.sql.support.PreparedStatementSupport;
 import org.agty.sql.support.RowFactory;
+import org.agty.sql.support.SqlIdentifierValidator;
 
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -35,6 +38,12 @@ public final class InsertOperation {
 
         if (arguments.returnLastInsertId()) {
             return insertAndReturnLastInsertId(arguments, query);
+        } else if (arguments.useStatementPrepare()) {
+            support.executePreparedUpdate(
+                    query,
+                    PreparedStatementSupport.insertParameters(arguments),
+                    arguments.noRebuildQuery()
+            );
         } else {
             support.execute(query, arguments.noRebuildQuery());
         }
@@ -54,6 +63,12 @@ public final class InsertOperation {
                 return 0L;
             }
 
+            if (arguments.useStatementPrepare()) {
+                support.bind(
+                        preparedStatement,
+                        PreparedStatementSupport.insertParameters(arguments)
+                );
+            }
             preparedStatement.executeUpdate();
 
             if (explicitPrimaryKeyValue != null) {
@@ -71,7 +86,7 @@ public final class InsertOperation {
             Long fallbackLastInsertId = support.lastInsertId(arguments);
             return fallbackLastInsertId == null ? 0L : fallbackLastInsertId;
         } catch (SQLException e) {
-            support.throwError("AgtySQL.insert()", e.getMessage());
+            support.throwError("AgtySQL.insert()", e);
             return 0L;
         }
     }
@@ -162,6 +177,14 @@ public final class InsertOperation {
     }
 
     public SqlRow insertAndGet(Arguments arguments, String fields) {
+        return insertAndGetValidated(arguments, SqlIdentifierValidator.requireFieldList(fields));
+    }
+
+    public SqlRow insertAndGet(Arguments arguments, SqlExpression fields) {
+        return insertAndGetValidated(arguments, requireExpression(fields, "RETURNING fields"));
+    }
+
+    private SqlRow insertAndGetValidated(Arguments arguments, String fields) {
         if (!support.getDialectCapabilities().supportsInsertAndGet()) {
             support.throwError(
                     "AgtySQL.insertAndGet()",
@@ -188,13 +211,12 @@ public final class InsertOperation {
     }
 
     private SqlRow insertAndGetReturning(Arguments arguments, String fields) {
-
         ResultSet resultSet = support.getDriverSqlObject().insertAndGet(arguments, fields);
-
-        try {
-            return support.getFetchRow(resultSet, arguments);
+        try (Statement statement = resultSet == null ? null : resultSet.getStatement();
+             ResultSet closeableResultSet = resultSet) {
+            return support.getFetchRow(closeableResultSet, arguments);
         } catch (SQLException e) {
-            support.throwError("AgtySQL.insertAndGet()", e.getMessage());
+            support.throwError("AgtySQL.insertAndGet()", e);
         }
 
         return RowFactory.emptyRow();
@@ -239,33 +261,45 @@ public final class InsertOperation {
             );
         }
 
-        SqlRow row = support.fetch(
-                Arguments.builder()
-                        .setTable(arguments.getTable())
-                        .setPrimaryKey(primaryKey)
-                        .setFields(fields)
-                        .setWhere("[%s] = %d".formatted(primaryKey, insertedId))
-        );
+        Arguments fetchArguments = Arguments.builder()
+                .useStatementPrepare(arguments.useStatementPrepare())
+                .setTable(arguments.getTable())
+                .setPrimaryKey(primaryKey)
+                .setFields(SqlExpression.trusted(fields));
+
+        if (arguments.useStatementPrepare()) {
+            fetchArguments.setWhere("[%s] = ?".formatted(primaryKey), insertedId);
+        } else {
+            fetchArguments.setWhere("[" + primaryKey + "] = %d", insertedId);
+        }
+
+        SqlRow row = support.fetch(fetchArguments);
 
         return row == null ? RowFactory.emptyRow() : row;
     }
 
     private Arguments copyArguments(Arguments source) {
         Arguments copy = Arguments.builder()
+                .useStatementPrepare(source.useStatementPrepare())
                 .setTable(source.getTable())
-                .setActionField(source.getActionField())
-                .setPrimaryKey(source.getPrimaryKey())
-                .setWhere(source.getWhere())
-                .setHaving(source.getHaving())
-                .setGroupBy(source.getGroupBy())
-                .setOrderBy(source.getOrderBy())
-                .setFields(source.getFields())
-                .setQuery(source.getQuery())
                 .convertValueToString(source.convertValueToString())
                 .setEmulateMode(source.isEmulateMode())
                 .setNoStringEncode(source.noStringEncode())
                 .setNoRebuildQuery(source.noRebuildQuery())
                 .setForceRebuildQuery(source.forceRebuildQuery());
+
+        copyStructuralArguments(source, copy);
+
+        if (source.hasWhere() && source.useStatementPrepare()) {
+            copy.setWhere(source.getWhere(), source.getWhereParameters().toArray());
+        } else if (source.hasWhere()) {
+            copy.setWhere(SqlExpression.trusted(source.getWhere()));
+        }
+        if (source.hasQuery() && source.useStatementPrepare()) {
+            copy.setQuery(source.getQuery(), source.getQueryParameters().toArray());
+        } else if (source.hasQuery()) {
+            copy.setQuery(SqlExpression.trusted(source.getQuery()));
+        }
 
         source.getDataMap().forEach((key, value) -> putData(copy, key, value));
         source.getColumns().forEach(copy::addColumn);
@@ -278,31 +312,56 @@ public final class InsertOperation {
         return copy;
     }
 
-    private void putData(Arguments arguments, String key, Object value) {
-        if (value == null) {
-            arguments.addData(key, (String) null);
-        } else if (value instanceof String stringValue) {
-            arguments.addData(key, stringValue);
-        } else if (value instanceof Integer integerValue) {
-            arguments.addData(key, integerValue);
-        } else if (value instanceof Long longValue) {
-            arguments.addData(key, longValue);
-        } else if (value instanceof Short shortValue) {
-            arguments.addData(key, shortValue);
-        } else if (value instanceof Boolean booleanValue) {
-            arguments.addData(key, booleanValue);
-        } else if (value instanceof Float floatValue) {
-            arguments.addData(key, floatValue);
-        } else if (value instanceof Double doubleValue) {
-            arguments.addData(key, doubleValue);
-        } else if (value instanceof Character characterValue) {
-            arguments.addData(key, characterValue);
-        } else {
-            arguments.addData(key, String.valueOf(value));
+    private void copyStructuralArguments(Arguments source, Arguments target) {
+        if (source.hasActionField()) {
+            target.setActionField(source.getActionField());
         }
+        if (source.getPrimaryKey() != null && !source.getPrimaryKey().isBlank()) {
+            target.setPrimaryKey(source.getPrimaryKey());
+        }
+        if (source.hasHaving()) {
+            target.setHaving(SqlExpression.trusted(source.getHaving()));
+        }
+        if (source.hasGroupBy()) {
+            target.setGroupBy(SqlExpression.trusted(source.getGroupBy()));
+        }
+        if (source.hasOrderBy()) {
+            target.setOrderBy(SqlExpression.trusted(source.getOrderBy()));
+        }
+        target.setFields(SqlExpression.trusted(source.getFields()));
+    }
+
+    private String requireExpression(SqlExpression expression, String role) {
+        if (expression == null) {
+            throw new IllegalArgumentException(role + " expression must not be null");
+        }
+        return expression.sql();
+    }
+
+    private void putData(Arguments arguments, String key, Object value) {
+        arguments.addData(key, value);
     }
 
     public void insert(ArrayList<Arguments> arguments) {
-        support.execute(support.getDriverSqlObject().insertQuery(arguments), false);
+        String query = support.getDriverSqlObject().insertQuery(arguments);
+        boolean prepared = arguments.stream().anyMatch(Arguments::useStatementPrepare);
+
+        if (prepared && arguments.stream().anyMatch(item -> !item.useStatementPrepare())) {
+            support.throwError(
+                    "AgtySQL.insert()",
+                    "All rows in a prepared multi-row insert must enable useStatementPrepare(true)"
+            );
+            return;
+        }
+
+        if (prepared) {
+            support.executePreparedUpdate(
+                    query,
+                    PreparedStatementSupport.insertParameters(arguments),
+                    false
+            );
+        } else {
+            support.execute(query, false);
+        }
     }
 }

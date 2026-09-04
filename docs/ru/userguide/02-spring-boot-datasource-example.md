@@ -1,7 +1,8 @@
 # 02. Пример DataSource для Spring Boot
 
 Ниже пример конфигурации в стиле Spring Boot, где библиотека выступает
-как основной `DataSource` bean вместо `HikariDataSource`.
+как основной `DataSource` bean. `AgtySqlPooledDataSource` сам использует
+HikariCP, поэтому его нельзя оборачивать вторым пулом.
 
 ```java
 import org.agty.sql.config.AgtySqlConfig;
@@ -52,7 +53,7 @@ public class SessionDataConfiguration {
   так же, как и с Hikari;
 - `@SpringSessionDataSource` говорит Spring Session использовать именно этот
   bean для таблицы `priv_session`;
-- `AgtySqlPooledDataSource` сам управляет пулом, поэтому отдельный
+- `AgtySqlPooledDataSource` сам управляет HikariCP-пулом, поэтому отдельный
   `HikariConfig` больше не нужен;
 - `schema`, `driver`, `server`, `database`, `user`, `password` остаются в
   `AgtySqlConfig`, потому что библиотека сама создает physical JDBC

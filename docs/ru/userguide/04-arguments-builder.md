@@ -25,6 +25,12 @@ Arguments.builder()
 - `setFields(...)` задает список полей для select-like операций.
 - если `fields` не задан, используется `*`.
 
+Обычные String-аргументы проверяются как SQL-идентификаторы. Допускаются
+простые имена, начинающиеся с буквы или `_` и продолжающиеся буквами, цифрами
+или `_`, qualified-имена через `.`, а также документированные формы `{table}`
+и `[column]`. Кавычки, комментарии, операторы и `;` отклоняются с
+`IllegalArgumentException`.
+
 Рекомендуется использовать ту же форму имен таблиц, что уже принята в проекте,
 например `"{users}"`.
 
@@ -38,29 +44,29 @@ Arguments.builder()
 
 Есть два варианта:
 
-- `setWhere(String where)`
 - `setWhere(String pattern, Object... args)`
+- `setWhere(SqlExpression.trusted(...))` для статического raw-выражения
 
 Можно накапливать условие вручную:
 
 ```java
 Arguments.builder()
         .setTable("{users}")
-        .setWhere("[active] = 1")
-        .appendWhere(" AND [role] = 'admin'");
+        .setWhere(SqlExpression.trusted("[active] = 1"))
+        .appendWhere(SqlExpression.trusted(" AND [role] = 'admin'"));
 ```
 
-`appendWhere(...)` полезен только если вы осознанно собираете выражение
-по частям.
+Непустые raw String-overloads `setWhere(String)` и `appendWhere(String)`
+deprecated и отклоняются. Они не должны получать request data.
 
 ### ORDER BY, GROUP BY, HAVING
 
 ```java
 Arguments.builder()
         .setTable("{orders}")
-        .setFields("user_id, COUNT(*) as total")
+        .setFields(SqlExpression.trusted("user_id, COUNT(*) AS total"))
         .setGroupBy("user_id")
-        .setHaving("COUNT(*) > 3")
+        .setHaving(SqlExpression.trusted("COUNT(*) > 3"))
         .setOrderBy("total DESC");
 ```
 
@@ -69,6 +75,15 @@ Arguments.builder()
 - `setOrderBy(...)`
 - `setGroupBy(...)`
 - `setHaving(...)`
+
+String-варианты `setFields`, `setGroupBy` и `setOrderBy` принимают только
+проверяемые идентификаторы и простые списки/направления сортировки. Функции,
+aliases и другие полноценные SQL-выражения требуют явного
+`SqlExpression.trusted(...)`.
+
+`SqlExpression.trusted(...)` ничего не экранирует и не проверяет. Это явная
+граница доверия только для статического SQL приложения или результата
+собственного allowlist. Никогда не создавайте его из HTTP/request-параметров.
 
 ### LIMIT и OFFSET
 
@@ -94,21 +109,56 @@ Arguments.builder()
 ```java
 Arguments.builder()
         .setTable("{users}")
-        .addData("name", "Alex")
-        .addData("age", 30)
-        .addData("active", true);
+        .addDataString("name", "Alex")
+        .addDataInt("age", 30)
+        .addDataBoolean("active", true);
 ```
 
-Поддерживаются основные scalar-типы:
+Именованные методы проверяют фактический runtime-тип. Это важно, если значение
+возвращается как `Object`:
+
+```java
+Object value = post.getData();
+
+Arguments.builder()
+        .addDataString("name", value); // Только String или null.
+```
+
+Если `value` содержит `Integer`, DTO, коллекцию или другой неподходящий тип,
+`addDataString(...)` сразу выбросит `IllegalArgumentException` до построения и
+выполнения SQL.
+
+Доступны методы:
+
+- `addDataString(...)` для `String`;
+- `addDataInt(...)` / `addDataInteger(...)` для `Integer`;
+- `addDataLong(...)`, `addDataShort(...)`, `addDataByte(...)`;
+- `addDataBoolean(...)` / `addDataBool(...)`;
+- `addDataFloat(...)`, `addDataDouble(...)`;
+- `addDataChar(...)` / `addDataCharacter(...)`;
+- `addDataDecimal(...)` / `addDataNumber(...)` для любого `Number`;
+- `addDataBigDecimal(...)` и `addDataBigInteger(...)` для строгой проверки
+  соответствующих типов.
+- `addDataNull(...)` для явного SQL `NULL` без неоднозначности overload-вызова.
+
+`addDataDecimal(...)` принимает `Byte`, `Short`, `Integer`, `Long`, `Float`,
+`Double`, `BigInteger`, `BigDecimal` и другие корректные реализации `Number`.
+Нестандартная реализация `Number` нормализуется в `BigDecimal`. `NaN` и
+бесконечные значения отклоняются.
+
+Compatibility-overloads `addData(...)` сохранены. Новый
+`addData(String, Object)` проверяет общий whitelist:
 
 - `String`
-- `Integer`
-- `Long`
-- `Short`
+- `Number`
 - `Boolean`
-- `Float`
-- `Double`
 - `Character`
+
+Любой другой runtime-тип приводит к `IllegalArgumentException`; неизвестный
+объект больше не преобразуется неявно через `toString()`.
+
+Имя поля в любом методе `addData...` обязательно: `null` приводит к
+`IllegalArgumentException` до сохранения данных и построения SQL.
 
 Порядок полей сохраняется, потому что внутри используется `LinkedHashMap`.
 
@@ -116,11 +166,17 @@ Arguments.builder()
 
 ```java
 Arguments.builder()
-        .setQuery("SELECT id, name FROM {users} WHERE [active] = 1 ORDER BY id ASC");
+        .setQuery(SqlExpression.trusted(
+                "SELECT id, name FROM {users} WHERE [active] = 1 ORDER BY id ASC"
+        ));
 ```
 
 Если задан `query`, он имеет приоритет над составными параметрами вроде
 `table`, `fields`, `where`.
+
+Непараметризованный raw query требует `SqlExpression.trusted(...)`.
+`setQuery(String)` deprecated и отклоняет непустой SQL. Для значений используйте
+prepared-вариант `setQuery("... WHERE id = ?", id)`.
 
 Использовать этот режим стоит, когда:
 
@@ -161,6 +217,43 @@ Arguments.builder()
 
 ### Поведенческие флаги
 
+#### `useStatementPrepare(true)`
+
+Prepared-режим включается явно. По умолчанию он отключён: библиотека сохраняет
+legacy-сборку SQL и HTML-кодирование строковых значений `addData(...)`.
+
+```java
+boolean updated = sql.update(
+        Arguments.builder()
+                .useStatementPrepare(true)
+                .setTable("{users}")
+                .addDataString("name", "O'Reilly & <admin>")
+                .setWhere("[id] = ?", 10)
+);
+```
+
+Итоговый update содержит placeholders, например
+`UPDATE ... SET name=? WHERE id=?`. JDBC получает значения отдельно и в таком
+порядке: `"O'Reilly & <admin>"`, затем `10`. Связанные строки сохраняются в
+исходном виде и не проходят через legacy HTML-кодирование.
+
+Правила prepared-режима:
+
+- в `setWhere(...)` нужно ставить `?` без SQL-кавычек, а значения передавать
+  следующими аргументами;
+- для raw SQL используется `setQuery("SELECT ... WHERE id = ?", id)`;
+- значения `addData(...)` для insert и update связываются автоматически;
+- `setNoStringEncode(...)` не влияет на связанные значения;
+- legacy-префикс raw-значения `[~` становится обычным текстом параметра;
+- имена таблиц и полей, сортировка, группировка и иная структура SQL не могут
+  передаваться через `?` и не должны формироваться из недоверенных данных;
+- для prepared multi-row insert режим должен быть включён у каждой строки.
+
+HTML-кодирование сохранено в режиме по умолчанию для совместимости, но оно не
+заменяет JDBC-привязку параметров. Legacy `%s` допускается только внутри
+одинарных SQL-кавычек; `%d`, `%f` и `%b` проверяют ожидаемый runtime-тип.
+Неизвестные placeholder и произвольные объекты отклоняются.
+
 #### `setReturnLastInsertId(true)`
 
 ```java
@@ -180,7 +273,7 @@ long id = sql.insert(
 
 ```java
 Arguments.builder()
-        .setQuery("SELECT 1")
+        .setQuery(SqlExpression.trusted("SELECT 1"))
         .setNoRebuildQuery(true);
 ```
 
@@ -191,7 +284,7 @@ Arguments.builder()
 
 ```java
 Arguments.builder()
-        .setQuery("SELECT * FROM {users}")
+        .setQuery(SqlExpression.trusted("SELECT * FROM {users}"))
         .setForceRebuildQuery(true);
 ```
 

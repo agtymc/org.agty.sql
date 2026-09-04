@@ -47,10 +47,10 @@ public class ColumnsBuilder implements ColumnBuilderInterface {
      */
     @Override
     public void addAdditionalFields(Map<String, Object> additionalFields) {
-        for (String key : additionalFields.keySet()) {
+        for (Map.Entry<String, Object> entry : additionalFields.entrySet()) {
             ColumnEntity columnEntity = new ColumnEntity(
-                    key,
-                    additionalFields.get(key)
+                    entry.getKey(),
+                    entry.getValue()
             );
 
             columns.add(columnEntity);

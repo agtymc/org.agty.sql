@@ -3,6 +3,7 @@ package org.agty.sql.dialect.mysql;
 import org.agty.sql.dialect.mysql.queries.*;
 import org.agty.sql.data.Arguments;
 import org.agty.sql.data.InsertData;
+import org.agty.sql.data.SqlExpression;
 import org.agty.sql.driver.DialectCapabilities;
 import org.agty.sql.driver.LastInsertIdStrategy;
 import org.agty.sql.driver.UpdateAndGetStrategy;
@@ -10,7 +11,9 @@ import org.agty.sql.driver.WriteReturnStrategy;
 import org.agty.sql.interfaces.SqlRow;
 import org.agty.sql.AgtySQL;
 import org.agty.sql.interfaces.Sql;
-import org.agty.sql.sqlbuilder.QueryValueDataBuilder;
+import org.agty.sql.sqlbuilder.SqlValueRenderer;
+import org.agty.sql.support.PreparedStatementSupport;
+import org.agty.sql.support.SqlIdentifierValidator;
 
 import java.sql.ResultSet;
 import java.util.*;
@@ -20,12 +23,12 @@ import java.util.*;
  */
 public class MySQL implements Sql {
     private final AgtySQL agtySQL;
-    private final String DRIVER = "mysql";
-    private final String DEFAULT_DATABASE = "";
-    private final String QUOTE_TABLE = "`";
-    private final String QUOTE_COLUMN = "`";
-    private final String QUOTE_VALUE = "'";
-    private final boolean SUPPORT_LARGE_UPDATE = false;
+    private static final String DRIVER = "mysql";
+    private static final String DEFAULT_DATABASE = "";
+    private static final String QUOTE_TABLE = "`";
+    private static final String QUOTE_COLUMN = "`";
+    private static final String QUOTE_VALUE = "'";
+    private static final boolean SUPPORT_LARGE_UPDATE = false;
 
     /**
      * Constructor.
@@ -171,7 +174,7 @@ public class MySQL implements Sql {
                 }
             }
         } catch (java.sql.SQLException e) {
-            throw new org.agty.sql.exceptions.AgtySqlException("MySQL.getPrimaryKey()", e.getMessage());
+            throw new org.agty.sql.exceptions.AgtySqlException("MySQL.getPrimaryKey()", e.getMessage(), e);
         }
 
         return null;
@@ -298,9 +301,14 @@ public class MySQL implements Sql {
      */
     @Override
     public boolean tableIsExists(String table) {
+        String database = SqlIdentifierValidator.requireColumn(
+                getAgtySQL().getConfig().getDatabase(),
+                "database"
+        );
         SqlRow fetch = getAgtySQL().fetch(
                 new Arguments()
-                        .setQuery("SHOW TABLE STATUS FROM `" + getAgtySQL().getConfig().getDatabase() + "` LIKE '" + table + "'")
+                        .useStatementPrepare(true)
+                        .setQuery("SHOW TABLE STATUS FROM `" + database + "` LIKE ?", table)
                         .setNoRebuildQuery(true)
         );
         return fetch.isSet("TABLE_NAME") || fetch.isSet("Name");
@@ -335,7 +343,9 @@ public class MySQL implements Sql {
 
         query.append(") AS is_exists");
 
-        SqlRow getData = getAgtySQL().fetch(query.toString());
+        SqlRow getData = getAgtySQL().fetch(
+                PreparedStatementSupport.readQueryArguments(arguments, query.toString())
+        );
 
         if (!getData.isSet("is_exists")) {
             return false;
@@ -429,7 +439,7 @@ public class MySQL implements Sql {
     public Long getLastInsertId(String table, String primaryKey) {
         SqlRow fetchLastId = getAgtySQL().fetch(
                 new Arguments()
-                        .setQuery("SELECT LAST_INSERT_ID() AS last_id")
+                        .setQuery(SqlExpression.trusted("SELECT LAST_INSERT_ID() AS last_id"))
                         .setNoRebuildQuery(true)
         );
 
@@ -448,7 +458,9 @@ public class MySQL implements Sql {
 
         if (query == null) return null;
 
-        SqlRow getData = getAgtySQL().fetch(query);
+        SqlRow getData = getAgtySQL().fetch(
+                PreparedStatementSupport.readQueryArguments(arguments, query)
+        );
 
         return getData.getLong("M");
     }
@@ -465,7 +477,9 @@ public class MySQL implements Sql {
 
         if (query == null) return null;
 
-        SqlRow getData = getAgtySQL().fetch(query);
+        SqlRow getData = getAgtySQL().fetch(
+                PreparedStatementSupport.readQueryArguments(arguments, query)
+        );
 
         return getData.getLong("M");
     }
@@ -510,7 +524,11 @@ public class MySQL implements Sql {
         InsertData insertData = new InsertData();
         insertData.setArguments(arguments);
         insertData.setFields(getInsertFields(arguments.getDataKeys()));
-        insertData.setValue(getInsertValues(arguments.getDataValues(), arguments.noStringEncode()));
+        insertData.setValue(getInsertValues(
+                arguments.getDataValues(),
+                arguments.noStringEncode(),
+                arguments.useStatementPrepare()
+        ));
 
         return insertData;
     }
@@ -529,7 +547,8 @@ public class MySQL implements Sql {
             insertData.setValue(
                     getInsertValues(
                             arguments.getDataValues(),
-                            arguments.noStringEncode()
+                            arguments.noStringEncode(),
+                            arguments.useStatementPrepare()
                     )
             );
         }
@@ -570,19 +589,24 @@ public class MySQL implements Sql {
      * @param noStringEncode если true, тогда спецсимволы не будут преобразованы.
      * @return строка параметров.
      */
-    private String getInsertValues(List<Object> valuesArray, boolean noStringEncode) {
+    private String getInsertValues(
+            List<Object> valuesArray,
+            boolean noStringEncode,
+            boolean statementPrepare
+    ) {
 
         StringBuilder values = new StringBuilder();
 
         //'value'
         for (Object value : valuesArray) {
             values.append(
-                    new QueryValueDataBuilder()
+                    new SqlValueRenderer()
                             .setQuoteColumn(getQuoteColumn())
                             .setQuoteValue(getQuoteValue())
                             .setValue(value)
                             .setNoStringEncode(noStringEncode)
-                            .build()
+                            .useStatementPrepare(statementPrepare)
+                            .render()
             );
 
             values.append(",");
@@ -611,13 +635,14 @@ public class MySQL implements Sql {
 
             //"key"=value
             returnData.append(
-                    new QueryValueDataBuilder()
+                    new SqlValueRenderer()
                             .setQuoteColumn(getQuoteColumn())
                             .setQuoteValue(getQuoteValue())
                             .setColumn(key)
                             .setValue(arguments.getData(key))
                             .setNoStringEncode(arguments.noStringEncode())
-                            .build()
+                            .useStatementPrepare(arguments.useStatementPrepare())
+                            .render()
             );
 
             returnData.append(",");

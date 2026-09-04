@@ -12,7 +12,6 @@ public class QueryFirstLast extends SqlQuery<QueryFirstLast> implements SqlQueri
     private String createdQuery;
 
     private boolean getLast = false;
-    private boolean getFirst = false;
 
     public QueryFirstLast(Arguments arguments) {
         setArguments(arguments);
@@ -20,13 +19,11 @@ public class QueryFirstLast extends SqlQuery<QueryFirstLast> implements SqlQueri
 
     public QueryFirstLast getLast() {
         this.getLast = true;
-        this.getFirst = false;
         return this;
     }
 
     public QueryFirstLast getFirst() {
         this.getLast = false;
-        this.getFirst = true;
         return this;
     }
 

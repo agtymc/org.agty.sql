@@ -8,6 +8,7 @@ import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.util.concurrent.ForkJoinPool;
 
 /**
  * Creates a JDBC connection for the current AgtySQL session.
@@ -33,11 +34,30 @@ public class AgtySqlConnection {
         String connectionUri = getConnectionURI();
         debugMessage(connectionUri);
 
+        Connection connection;
         if (isSqliteDriver()) {
-            return DriverManager.getConnection(connectionUri);
+            connection = DriverManager.getConnection(connectionUri);
+        } else {
+            connection = DriverManager.getConnection(
+                    connectionUri,
+                    getConfig().getUser(),
+                    getConfig().getPassword()
+            );
         }
-
-        return DriverManager.getConnection(connectionUri, getConfig().getUser(), getConfig().getPassword());
+        try {
+            connection.setAutoCommit(getConfig().isAutoCommit());
+            if (getConfig().getNetworkTimeoutMillis() > 0) {
+                connection.setNetworkTimeout(ForkJoinPool.commonPool(), getConfig().getNetworkTimeoutMillis());
+            }
+            return connection;
+        } catch (SQLException e) {
+            try {
+                connection.close();
+            } catch (SQLException closeException) {
+                e.addSuppressed(closeException);
+            }
+            throw e;
+        }
     }
 
     private void debugMessage(String connectionUri) {
@@ -46,7 +66,7 @@ public class AgtySqlConnection {
         }
     }
 
-    private String getConnectionURI() {
+    String getConnectionURI() {
         if (isSqliteDriver()) {
             return getSqliteConnectionUri();
         }
@@ -80,6 +100,8 @@ public class AgtySqlConnection {
         connectURI.append(getConfig().getEncoding());
         connectURI.append("&characterSetResults=");
         connectURI.append(getConfig().getEncoding());
+
+        appendNetworkProperties(connectURI);
 
         if (getConfig().isSchema()) {
             connectURI.append("&currentSchema=");
@@ -131,9 +153,44 @@ public class AgtySqlConnection {
         }
 
         connectURI.append("encrypt=true;");
-        connectURI.append("trustServerCertificate=true;");
+        connectURI.append("trustServerCertificate=");
+        connectURI.append(getConfig().isTrustServerCertificate());
+        connectURI.append(';');
+
+        if (getConfig().getLoginTimeoutSeconds() > 0) {
+            connectURI.append("loginTimeout=");
+            connectURI.append(getConfig().getLoginTimeoutSeconds());
+            connectURI.append(';');
+        }
+        if (getConfig().getNetworkTimeoutMillis() > 0) {
+            connectURI.append("socketTimeout=");
+            connectURI.append(getConfig().getNetworkTimeoutMillis());
+            connectURI.append(';');
+        }
 
         return connectURI.toString();
+    }
+
+    private void appendNetworkProperties(StringBuilder connectURI) {
+        int loginTimeoutSeconds = getConfig().getLoginTimeoutSeconds();
+        int networkTimeoutMillis = getConfig().getNetworkTimeoutMillis();
+
+        if (loginTimeoutSeconds > 0) {
+            connectURI.append("&connectTimeout=");
+            connectURI.append("postgresql".equalsIgnoreCase(getDriver())
+                    ? loginTimeoutSeconds
+                    : loginTimeoutSeconds * 1000L);
+            if ("postgresql".equalsIgnoreCase(getDriver())) {
+                connectURI.append("&loginTimeout=");
+                connectURI.append(loginTimeoutSeconds);
+            }
+        }
+        if (networkTimeoutMillis > 0) {
+            connectURI.append("&socketTimeout=");
+            connectURI.append("postgresql".equalsIgnoreCase(getDriver())
+                    ? Math.max(1L, (networkTimeoutMillis + 999L) / 1000L)
+                    : networkTimeoutMillis);
+        }
     }
 
     private String normalizeDatabasePath() {

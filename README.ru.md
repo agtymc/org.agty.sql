@@ -4,12 +4,12 @@
 high-level API, низкоуровневым JDBC-доступом, курсорным чтением и удобным
 entity/model-слоем.
 
-Проект собирается через Maven и сейчас ориентирован на Java 18.
+Проект собирается через Maven и требует Java 21 или новее.
 Исходный репозиторий: `https://github.com/agtymc/org.agty.sql`
 
 ## Поддерживаемые Драйверы
 
-Актуальная поддержка SQL-драйверов в `2.0.4`:
+Актуальная поддержка SQL-драйверов в `2.1.0`:
 
 - MySQL
 - MariaDB
@@ -61,7 +61,7 @@ entity/model-слоем.
     <dependency>
         <groupId>org.agty</groupId>
         <artifactId>org-agty-sql</artifactId>
-        <version>2.0.4</version>
+        <version>2.1.0</version>
     </dependency>
 </dependencies>
 ```
@@ -88,10 +88,10 @@ entity/model-слоем.
 
 ```bash
 mvn install:install-file \
-  -Dfile=path/to/org-agty-sql-2.0.4.jar \
+  -Dfile=path/to/org-agty-sql-2.1.0.jar \
   -DgroupId=org.agty \
   -DartifactId=org-agty-sql \
-  -Dversion=2.0.4 \
+  -Dversion=2.1.0 \
   -Dpackaging=jar
 ```
 
@@ -101,7 +101,7 @@ mvn install:install-file \
 <dependency>
     <groupId>org.agty</groupId>
     <artifactId>org-agty-sql</artifactId>
-    <version>2.0.4</version>
+    <version>2.1.0</version>
 </dependency>
 ```
 

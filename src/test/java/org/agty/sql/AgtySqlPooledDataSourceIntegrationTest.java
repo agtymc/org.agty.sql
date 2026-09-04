@@ -15,6 +15,12 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Duration;
 import java.util.UUID;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 class AgtySqlPooledDataSourceIntegrationTest {
 
@@ -102,10 +108,94 @@ class AgtySqlPooledDataSourceIntegrationTest {
         }
     }
 
+    @Test
+    void connectionHandleCloseIsConcurrentSafeAndCannotExposePhysicalConnection() throws Exception {
+        Path databasePath = newDatabasePath("guard");
+        AgtySqlPooledDataSource dataSource = createDataSource(databasePath, 1, 0);
+        Connection connection = dataSource.getConnection();
+
+        Assertions.assertThrows(
+                SQLException.class,
+                () -> connection.unwrap(org.h2.jdbc.JdbcConnection.class)
+        );
+
+        ExecutorService executor = Executors.newFixedThreadPool(4);
+        CountDownLatch start = new CountDownLatch(1);
+        List<Future<?>> closes = new ArrayList<>();
+        try {
+            for (int index = 0; index < 4; index++) {
+                closes.add(executor.submit(() -> {
+                    start.await();
+                    connection.close();
+                    return null;
+                }));
+            }
+            start.countDown();
+            for (Future<?> close : closes) {
+                close.get();
+            }
+            Assertions.assertTrue(connection.isClosed());
+            Assertions.assertEquals(0, dataSource.getActiveConnections());
+
+            try (Connection current = dataSource.getConnection()) {
+                connection.close();
+                Assertions.assertThrows(SQLException.class, connection::createStatement);
+                Assertions.assertFalse(current.isClosed());
+                Assertions.assertThrows(SQLException.class, dataSource::getConnection);
+            }
+        } finally {
+            executor.shutdownNow();
+            dataSource.close();
+            deleteDatabaseFiles(databasePath);
+        }
+    }
+
+    @Test
+    void returnedConnectionRollsBackAndPoolCloseInvalidatesActiveHandle() throws Exception {
+        Path databasePath = newDatabasePath("state-reset");
+        AgtySqlPooledDataSource dataSource = createDataSource(databasePath, 1, 0);
+        try {
+            try (Connection setup = dataSource.getConnection();
+                 Statement statement = setup.createStatement()) {
+                statement.execute("CREATE TABLE tx_data (id BIGINT PRIMARY KEY)");
+            }
+
+            Connection transaction = dataSource.getConnection();
+            String originalSchema = transaction.getSchema();
+            int originalIsolation = transaction.getTransactionIsolation();
+            transaction.setTransactionIsolation(Connection.TRANSACTION_SERIALIZABLE);
+            transaction.setSchema("INFORMATION_SCHEMA");
+            transaction.setAutoCommit(false);
+            try (Statement statement = transaction.createStatement()) {
+                statement.executeUpdate("INSERT INTO PUBLIC.tx_data (id) VALUES (1)");
+            }
+            transaction.close();
+
+            Connection verification = dataSource.getConnection();
+            Assertions.assertTrue(verification.getAutoCommit());
+            Assertions.assertEquals(originalSchema, verification.getSchema());
+            Assertions.assertEquals(originalIsolation, verification.getTransactionIsolation());
+            try (Statement statement = verification.createStatement();
+                 ResultSet resultSet = statement.executeQuery("SELECT COUNT(*) FROM tx_data")) {
+                Assertions.assertTrue(resultSet.next());
+                Assertions.assertEquals(0, resultSet.getInt(1));
+            }
+
+            dataSource.close();
+            Assertions.assertTrue(verification.isClosed());
+            Assertions.assertThrows(SQLException.class, verification::createStatement);
+            Assertions.assertThrows(SQLException.class, dataSource::getConnection);
+        } finally {
+            dataSource.close();
+            deleteDatabaseFiles(databasePath);
+        }
+    }
+
     private AgtySqlPooledDataSource createDataSource(Path databasePath, int maxPoolSize, int minIdle) {
         AgtySqlConfig config = new AgtySqlConfig()
                 .setDriver("h2")
                 .setDatabase(databasePath.toString())
+                .setSchema("PUBLIC")
                 .setPfx("")
                 .setThrowException(true)
                 .setDebug(false);

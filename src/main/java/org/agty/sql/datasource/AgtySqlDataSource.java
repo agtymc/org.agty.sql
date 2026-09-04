@@ -25,6 +25,7 @@ public class AgtySqlDataSource implements DataSource {
             throw new IllegalArgumentException("AgtySqlConfig must not be null");
         }
         this.config = AgtySqlConfig.getClone(config);
+        this.loginTimeout = config.getLoginTimeoutSeconds();
     }
 
     public AgtySqlConfig getConfig() {
@@ -33,9 +34,7 @@ public class AgtySqlDataSource implements DataSource {
 
     @Override
     public Connection getConnection() throws SQLException {
-        Connection connection = new AgtySqlConnection(config, resolveDriverName()).getConnection();
-        applyLoginTimeout(connection);
-        return connection;
+        return new AgtySqlConnection(connectionConfig(config), resolveDriverName()).getConnection();
     }
 
     @Override
@@ -43,9 +42,7 @@ public class AgtySqlDataSource implements DataSource {
         AgtySqlConfig overriddenConfig = AgtySqlConfig.getClone(config)
                 .setUser(username)
                 .setPassword(password);
-        Connection connection = new AgtySqlConnection(overriddenConfig, resolveDriverName()).getConnection();
-        applyLoginTimeout(connection);
-        return connection;
+        return new AgtySqlConnection(connectionConfig(overriddenConfig), resolveDriverName()).getConnection();
     }
 
     @Override
@@ -60,6 +57,9 @@ public class AgtySqlDataSource implements DataSource {
 
     @Override
     public void setLoginTimeout(int seconds) {
+        if (seconds < 0) {
+            throw new IllegalArgumentException("Login timeout must not be negative");
+        }
         this.loginTimeout = seconds;
     }
 
@@ -90,9 +90,7 @@ public class AgtySqlDataSource implements DataSource {
         return DialectDriverRegistry.getDriverName(config.getDriver());
     }
 
-    private void applyLoginTimeout(Connection connection) throws SQLException {
-        if (loginTimeout > 0) {
-            connection.setNetworkTimeout(Runnable::run, loginTimeout * 1000);
-        }
+    private AgtySqlConfig connectionConfig(AgtySqlConfig source) {
+        return AgtySqlConfig.getClone(source).setLoginTimeoutSeconds(loginTimeout);
     }
 }

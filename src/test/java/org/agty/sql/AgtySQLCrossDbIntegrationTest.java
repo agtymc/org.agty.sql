@@ -5,12 +5,14 @@ import org.agty.sql.interfaces.SqlRow;
 import org.agty.sql.support.TestDatabaseProfile;
 import org.agty.sql.support.TestDatabaseProfiles;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import java.util.LinkedList;
 import java.util.stream.Stream;
 
+@Tag("integration")
 class AgtySQLCrossDbIntegrationTest {
 
     private static Stream<TestDatabaseProfile> sqlServers() {
@@ -66,6 +68,38 @@ class AgtySQLCrossDbIntegrationTest {
             Assertions.assertEquals(3, rows.size());
             Assertions.assertEquals(2L, rows.getFirst().getLong("id"));
             Assertions.assertEquals(4L, rows.getLast().getLong("id"));
+        } finally {
+            dropTableQuietly(sql, table);
+            sql.close();
+        }
+    }
+
+    @ParameterizedTest(name = "column aliases: {0}")
+    @MethodSource("sqlServers")
+    void usesColumnLabelsForAliases(TestDatabaseProfile profile) {
+        AgtySQL sql = profile.createSql();
+        String table = profile.tableName();
+
+        try {
+            recreateTable(sql, profile);
+            insertRows(sql, table);
+
+            Arguments query = Arguments.builder().setQuery(
+                    org.agty.sql.data.SqlExpression.trusted(
+                            "SELECT [string] AS selected_value FROM " + table + " WHERE [id] = 2"
+                    )
+            );
+
+            SqlRow fetched = sql.fetch(query);
+            Assertions.assertEquals("value-2", fetched.getString("selected_value"));
+            Assertions.assertNull(fetched.getObject("string"));
+
+            LinkedList<SqlRow> listed = sql.listArray(query);
+            Assertions.assertEquals("value-2", listed.getFirst().getString("selected_value"));
+
+            try (AgtySqlCursor cursor = sql.openCursor(query)) {
+                Assertions.assertEquals("value-2", cursor.next().getString("selected_value"));
+            }
         } finally {
             dropTableQuietly(sql, table);
             sql.close();

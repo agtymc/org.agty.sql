@@ -10,7 +10,7 @@ class AgtySqlConfigInitTest {
 
     @Test
     void loadsMysqlSectionFromDefaultConfig() {
-        AgtySqlConfig config = new AgtySqlConfigInit("mysql").getConfig();
+        AgtySqlConfig config = new AgtySqlConfigInit("mysql", "config.ini-sample").getConfig();
 
         assertEquals("mysql", config.getDriver());
         assertEquals("localhost", config.getServer());
@@ -21,7 +21,7 @@ class AgtySqlConfigInitTest {
 
     @Test
     void loadsMariadbSectionFromDefaultConfig() {
-        AgtySqlConfig config = new AgtySqlConfigInit("mariadb").getConfig();
+        AgtySqlConfig config = new AgtySqlConfigInit("mariadb", "config.ini-sample").getConfig();
 
         assertEquals("mariadb", config.getDriver());
         assertEquals("localhost", config.getServer());
@@ -32,7 +32,7 @@ class AgtySqlConfigInitTest {
 
     @Test
     void loadsPgsqlSectionFromDefaultConfig() {
-        AgtySqlConfig config = new AgtySqlConfigInit("pgsql").getConfig();
+        AgtySqlConfig config = new AgtySqlConfigInit("pgsql", "config.ini-sample").getConfig();
 
         assertEquals("pgsql", config.getDriver());
         assertEquals("localhost", config.getServer());
@@ -43,7 +43,7 @@ class AgtySqlConfigInitTest {
 
     @Test
     void loadsMssqlSectionFromDefaultConfig() {
-        AgtySqlConfig config = new AgtySqlConfigInit("mssql").getConfig();
+        AgtySqlConfig config = new AgtySqlConfigInit("mssql", "config.ini-sample").getConfig();
 
         assertEquals("mssql", config.getDriver());
         assertEquals("localhost", config.getServer());
@@ -55,8 +55,8 @@ class AgtySqlConfigInitTest {
 
     @Test
     void loadsFileDatabaseSectionsFromDefaultConfig() {
-        AgtySqlConfig sqlite = new AgtySqlConfigInit("sqlite").getConfig();
-        AgtySqlConfig h2 = new AgtySqlConfigInit("h2").getConfig();
+        AgtySqlConfig sqlite = new AgtySqlConfigInit("sqlite", "config.ini-sample").getConfig();
+        AgtySqlConfig h2 = new AgtySqlConfigInit("h2", "config.ini-sample").getConfig();
 
         assertEquals("sqlite", sqlite.getDriver());
         assertEquals("databases/sqlite/agty_sql.sqlite", sqlite.getDatabase());
