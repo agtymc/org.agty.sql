@@ -64,6 +64,7 @@ jobs:
       - name: Start integration databases
         run: |
           cp config.ini-sample config.ini
+          mkdir -p databases/sqlite databases/h2
           ./install/install-mysql.sh
           ./install/install-mariadb.sh
           ./install/install-pgsql.sh
