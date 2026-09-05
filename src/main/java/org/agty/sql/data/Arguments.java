@@ -15,8 +15,6 @@ import java.util.*;
  */
 public class Arguments {
 
-    private static final String SUPPORTED_DATA_TYPES = "String, Number, Boolean, Character";
-
     /**
      * @deprecated Use {@link #setTable(String)} and {@link #getTable()}.
      * Direct assignments are validated when the value is read.
@@ -51,11 +49,8 @@ public class Arguments {
     /** A GROUP BY clause*/
     private String orderBy = "";
 
-    /** Data for query*/
-    private final Map<String, Object> data = new LinkedHashMap<>();
-
-    /** Original data values used by PreparedStatement*/
-    private final Map<String, Object> preparedData = new LinkedHashMap<>();
+    /** Legacy-rendered and prepared values for write queries. */
+    private final ArgumentDataStore data = new ArgumentDataStore();
 
     /** Columns set*/
     private final List<String> columns = new LinkedList<>();
@@ -948,7 +943,7 @@ public class Arguments {
             return addDataChar(field, value);
         }
 
-        throw unsupportedDataType(field, value);
+        throw ArgumentValueNormalizer.unsupportedDataType(field, value);
     }
 
     /**
@@ -958,7 +953,7 @@ public class Arguments {
      * @return current arguments
      */
     public Arguments addDataString(String field, Object value) {
-        String stringValue = requireDataType(field, value, String.class);
+        String stringValue = ArgumentValueNormalizer.requireType(field, value, String.class);
         dataPut(field, stringValue, stringValue);
         return this;
     }
@@ -970,7 +965,7 @@ public class Arguments {
      * @return current arguments
      */
     public Arguments addDataInt(String field, Object value) {
-        dataPut(field, requireDataType(field, value, Integer.class));
+        dataPut(field, ArgumentValueNormalizer.requireType(field, value, Integer.class));
         return this;
     }
 
@@ -991,7 +986,7 @@ public class Arguments {
      * @return current arguments
      */
     public Arguments addDataLong(String field, Object value) {
-        dataPut(field, requireDataType(field, value, Long.class));
+        dataPut(field, ArgumentValueNormalizer.requireType(field, value, Long.class));
         return this;
     }
 
@@ -1002,7 +997,7 @@ public class Arguments {
      * @return current arguments
      */
     public Arguments addDataShort(String field, Object value) {
-        dataPut(field, requireDataType(field, value, Short.class));
+        dataPut(field, ArgumentValueNormalizer.requireType(field, value, Short.class));
         return this;
     }
 
@@ -1013,7 +1008,7 @@ public class Arguments {
      * @return current arguments
      */
     public Arguments addDataByte(String field, Object value) {
-        dataPut(field, requireDataType(field, value, Byte.class));
+        dataPut(field, ArgumentValueNormalizer.requireType(field, value, Byte.class));
         return this;
     }
 
@@ -1024,7 +1019,7 @@ public class Arguments {
      * @return current arguments
      */
     public Arguments addDataBoolean(String field, Object value) {
-        dataPut(field, requireDataType(field, value, Boolean.class));
+        dataPut(field, ArgumentValueNormalizer.requireType(field, value, Boolean.class));
         return this;
     }
 
@@ -1045,8 +1040,8 @@ public class Arguments {
      * @return current arguments
      */
     public Arguments addDataFloat(String field, Object value) {
-        Float number = requireDataType(field, value, Float.class);
-        validateFiniteNumber(field, number);
+        Float number = ArgumentValueNormalizer.requireType(field, value, Float.class);
+        ArgumentValueNormalizer.validateFiniteNumber(field, number);
         dataPut(field, number);
         return this;
     }
@@ -1058,8 +1053,8 @@ public class Arguments {
      * @return current arguments
      */
     public Arguments addDataDouble(String field, Object value) {
-        Double number = requireDataType(field, value, Double.class);
-        validateFiniteNumber(field, number);
+        Double number = ArgumentValueNormalizer.requireType(field, value, Double.class);
+        ArgumentValueNormalizer.validateFiniteNumber(field, number);
         dataPut(field, number);
         return this;
     }
@@ -1073,8 +1068,8 @@ public class Arguments {
      * @return current arguments
      */
     public Arguments addDataDecimal(String field, Object value) {
-        Number number = requireDataType(field, value, Number.class);
-        dataPut(field, normalizeNumber(field, number));
+        Number number = ArgumentValueNormalizer.requireType(field, value, Number.class);
+        dataPut(field, ArgumentValueNormalizer.normalizeNumber(field, number));
         return this;
     }
 
@@ -1095,7 +1090,7 @@ public class Arguments {
      * @return current arguments
      */
     public Arguments addDataBigDecimal(String field, Object value) {
-        dataPut(field, requireDataType(field, value, BigDecimal.class));
+        dataPut(field, ArgumentValueNormalizer.requireType(field, value, BigDecimal.class));
         return this;
     }
 
@@ -1106,7 +1101,7 @@ public class Arguments {
      * @return current arguments
      */
     public Arguments addDataBigInteger(String field, Object value) {
-        dataPut(field, requireDataType(field, value, BigInteger.class));
+        dataPut(field, ArgumentValueNormalizer.requireType(field, value, BigInteger.class));
         return this;
     }
 
@@ -1117,7 +1112,7 @@ public class Arguments {
      * @return current arguments
      */
     public Arguments addDataChar(String field, Object value) {
-        dataPut(field, requireDataType(field, value, Character.class));
+        dataPut(field, ArgumentValueNormalizer.requireType(field, value, Character.class));
         return this;
     }
 
@@ -1246,9 +1241,7 @@ public class Arguments {
     }
 
     private void dataPut(String field, Object legacyValue, Object preparedValue) {
-        SqlIdentifierValidator.requireColumn(field, "data field");
-        data.put(field, legacyValue);
-        preparedData.put(field, preparedValue);
+        data.put(field, legacyValue, preparedValue);
     }
 
     private String requireExpression(SqlExpression expression, String role) {
@@ -1270,78 +1263,6 @@ public class Arguments {
             return template;
         }
         return LegacySqlFormatter.format(template, values);
-    }
-
-    private <T> T requireDataType(String field, Object value, Class<T> expectedType) {
-        if (value == null) {
-            return null;
-        }
-        if (!expectedType.isInstance(value)) {
-            throw new IllegalArgumentException(
-                    "Invalid data type for field '%s': expected %s, got %s".formatted(
-                            field,
-                            expectedType.getSimpleName(),
-                            value.getClass().getName()
-                    )
-            );
-        }
-        return expectedType.cast(value);
-    }
-
-    private Number normalizeNumber(String field, Number value) {
-        if (value == null) {
-            return null;
-        }
-        if (value instanceof Float || value instanceof Double) {
-            validateFiniteNumber(field, value);
-        }
-        if (value instanceof Byte
-                || value instanceof Short
-                || value instanceof Integer
-                || value instanceof Long
-                || value instanceof Float
-                || value instanceof Double
-                || value instanceof BigInteger
-                || value instanceof BigDecimal) {
-            return value;
-        }
-
-        try {
-            return new BigDecimal(value.toString());
-        } catch (NumberFormatException exception) {
-            throw new IllegalArgumentException(
-                    "Unsupported Number implementation for field '%s': %s".formatted(
-                            field,
-                            value.getClass().getName()
-                    ),
-                    exception
-            );
-        }
-    }
-
-    private void validateFiniteNumber(String field, Number value) {
-        if (value instanceof Float floatValue && !Float.isFinite(floatValue)) {
-            throw invalidDecimalValue(field, value);
-        }
-        if (value instanceof Double doubleValue && !Double.isFinite(doubleValue)) {
-            throw invalidDecimalValue(field, value);
-        }
-    }
-
-    private IllegalArgumentException invalidDecimalValue(String field, Number value) {
-        return new IllegalArgumentException(
-                "Invalid decimal value for field '%s': %s is not finite".formatted(field, value)
-        );
-    }
-
-    private IllegalArgumentException unsupportedDataType(String field, Object value) {
-        return new IllegalArgumentException(
-                "Unsupported data type for field '%s': %s. Supported types: %s".formatted(
-                        field,
-                        value.getClass().getName(),
-                        SUPPORTED_DATA_TYPES
-                )
-        );
     }
 
     /**
@@ -1375,7 +1296,6 @@ public class Arguments {
      */
     public void removeData(String field) {
         data.remove(field);
-        preparedData.remove(field);
     }
 
     /**
@@ -1392,7 +1312,6 @@ public class Arguments {
      */
     public void clearData() {
         data.clear();
-        preparedData.clear();
     }
 
     /**
@@ -1410,7 +1329,7 @@ public class Arguments {
      * @return копия коллекции массива с данными.
      */
     public LinkedHashMap<String, Object> getDataMap() {
-        return new LinkedHashMap<String, Object>(useStatementPrepare() ? preparedData : data);
+        return data.copy(useStatementPrepare());
     }
 
     /**
@@ -1429,7 +1348,7 @@ public class Arguments {
      * @return объект содержимого.
      */
     public Object getData(String key) {
-        return (useStatementPrepare() ? preparedData : data).get(key);
+        return data.get(key, useStatementPrepare());
     }
 
     /**
@@ -1448,7 +1367,7 @@ public class Arguments {
      * @return массив ключей.
      */
     public LinkedList<String> getDataKeys() {
-        return new LinkedList<String>(data.keySet());
+        return data.keys();
     }
 
     /**
@@ -1467,7 +1386,7 @@ public class Arguments {
      * @return массив значений.
      */
     public LinkedList<Object> getDataValues() {
-        return new LinkedList<Object>((useStatementPrepare() ? preparedData : data).values());
+        return data.values(useStatementPrepare());
     }
 
     /**
@@ -1588,7 +1507,7 @@ public class Arguments {
         //Данные
         toString.append("\tData: {\n");
 
-        for (Map.Entry<String, Object> entry: data.entrySet()) {
+        for (Map.Entry<String, Object> entry: data.legacyEntries()) {
             toString.append("\t\t");
             toString.append(entry.getKey());
             toString.append(" = ");

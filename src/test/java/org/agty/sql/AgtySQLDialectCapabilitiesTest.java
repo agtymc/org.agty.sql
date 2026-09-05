@@ -5,6 +5,7 @@ import org.agty.sql.config.AgtySqlConfig;
 import org.agty.sql.data.Arguments;
 import org.agty.sql.driver.DialectCapabilities;
 import org.agty.sql.driver.LastInsertIdStrategy;
+import org.agty.sql.driver.ReadAfterWriteSafety;
 import org.agty.sql.driver.UpdateAndGetStrategy;
 import org.agty.sql.driver.WriteReturnStrategy;
 import org.agty.sql.exceptions.AgtySqlException;
@@ -115,6 +116,51 @@ class AgtySQLDialectCapabilitiesTest {
         Assertions.assertTrue(unsafeFollowUp.usesFollowUpFetchForUpdateAndGet());
         Assertions.assertTrue(unsafeFollowUp.usesUnsafeFollowUpForUpdateAndGet());
         Assertions.assertTrue(unsafeFollowUp.updateAndGetStrategy().isCollisionProne());
+    }
+
+    @Test
+    void exposesExplicitReadAfterWriteSafetyLevels() {
+        DialectCapabilities postgresql = DialectDriverRegistry
+                .getDialect("pgsql", null)
+                .getCapabilities();
+        DialectCapabilities mysql = DialectDriverRegistry
+                .getDialect("mysql", null)
+                .getCapabilities();
+        DialectCapabilities mariadb = DialectDriverRegistry
+                .getDialect("mariadb", null)
+                .getCapabilities();
+        DialectCapabilities sqlite = DialectDriverRegistry
+                .getDialect("sqlite", null)
+                .getCapabilities();
+        DialectCapabilities h2 = DialectDriverRegistry
+                .getDialect("h2", null)
+                .getCapabilities();
+        DialectCapabilities mssql = DialectDriverRegistry
+                .getDialect("mssql", null)
+                .getCapabilities();
+
+        Assertions.assertEquals(ReadAfterWriteSafety.ATOMIC, postgresql.insertAndGetSafety());
+        Assertions.assertEquals(ReadAfterWriteSafety.ATOMIC, postgresql.updateAndGetSafety());
+        Assertions.assertEquals(ReadAfterWriteSafety.CONNECTION_SCOPED, postgresql.lastInsertIdSafety());
+
+        Assertions.assertEquals(ReadAfterWriteSafety.TRANSACTION_GUARDED, mysql.insertAndGetSafety());
+        Assertions.assertEquals(ReadAfterWriteSafety.COLLISION_PRONE, mysql.updateAndGetSafety());
+        Assertions.assertTrue(mysql.insertAndGetSafety().requiresTransaction());
+
+        Assertions.assertEquals(ReadAfterWriteSafety.TRANSACTION_GUARDED, mariadb.insertAndGetSafety());
+        Assertions.assertEquals(ReadAfterWriteSafety.COLLISION_PRONE, mariadb.updateAndGetSafety());
+        Assertions.assertEquals(ReadAfterWriteSafety.CONNECTION_SCOPED, mariadb.lastInsertIdSafety());
+
+        Assertions.assertEquals(ReadAfterWriteSafety.TRANSACTION_GUARDED, sqlite.insertAndGetSafety());
+        Assertions.assertEquals(ReadAfterWriteSafety.COLLISION_PRONE, sqlite.updateAndGetSafety());
+        Assertions.assertEquals(ReadAfterWriteSafety.CONNECTION_SCOPED, sqlite.lastInsertIdSafety());
+
+        Assertions.assertEquals(ReadAfterWriteSafety.COLLISION_PRONE, h2.insertAndGetSafety());
+        Assertions.assertTrue(h2.updateAndGetSafety().isCollisionProne());
+
+        Assertions.assertEquals(ReadAfterWriteSafety.ATOMIC, mssql.insertAndGetSafety());
+        Assertions.assertEquals(ReadAfterWriteSafety.ATOMIC, mssql.updateAndGetSafety());
+        Assertions.assertEquals(ReadAfterWriteSafety.CONNECTION_SCOPED, mssql.lastInsertIdSafety());
     }
 
     @Test

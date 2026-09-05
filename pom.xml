@@ -171,7 +171,8 @@
                 <artifactId>maven-javadoc-plugin</artifactId>
                 <version>3.12.0</version>
                 <configuration>
-                    <doclint>all</doclint>
+                    <doclint>all,-missing</doclint>
+                    <failOnWarnings>true</failOnWarnings>
                     <notimestamp>true</notimestamp>
                     <quiet>true</quiet>
                 </configuration>

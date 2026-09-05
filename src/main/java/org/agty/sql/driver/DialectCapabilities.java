@@ -86,4 +86,50 @@ public record DialectCapabilities(
     public boolean usesUnsafeLastInsertIdFallback() {
         return lastInsertIdStrategy == LastInsertIdStrategy.FETCH_LAST_ROW_UNSAFE;
     }
+
+    /**
+     * Returns the reliability guarantee of generated-ID resolution.
+     *
+     * @return generated-ID safety level
+     */
+    public ReadAfterWriteSafety lastInsertIdSafety() {
+        return switch (lastInsertIdStrategy) {
+            case NONE -> ReadAfterWriteSafety.UNSUPPORTED;
+            case CONNECTION_FUNCTION, SEQUENCE_FUNCTION -> ReadAfterWriteSafety.CONNECTION_SCOPED;
+            case FETCH_LAST_ROW_UNSAFE -> ReadAfterWriteSafety.COLLISION_PRONE;
+        };
+    }
+
+    /**
+     * Returns the reliability guarantee of {@code insertAndGet}.
+     *
+     * <p>A follow-up read should be kept in the same explicit transaction even
+     * when the generated identifier itself is connection-scoped.</p>
+     *
+     * @return insert-return safety level
+     */
+    public ReadAfterWriteSafety insertAndGetSafety() {
+        return switch (insertAndGetStrategy) {
+            case NONE -> ReadAfterWriteSafety.UNSUPPORTED;
+            case NATIVE_RETURNING -> ReadAfterWriteSafety.ATOMIC;
+            case FOLLOW_UP_FETCH -> usesUnsafeLastInsertIdFallback()
+                    ? ReadAfterWriteSafety.COLLISION_PRONE
+                    : ReadAfterWriteSafety.TRANSACTION_GUARDED;
+        };
+    }
+
+    /**
+     * Returns the reliability guarantee of {@code updateAndGet}.
+     *
+     * @return update-return safety level
+     */
+    public ReadAfterWriteSafety updateAndGetSafety() {
+        return switch (updateAndGetStrategy) {
+            case NONE -> ReadAfterWriteSafety.UNSUPPORTED;
+            case NATIVE_RETURNING -> ReadAfterWriteSafety.ATOMIC;
+            case FOLLOW_UP_FETCH_BY_PRIMARY_KEY -> ReadAfterWriteSafety.TRANSACTION_GUARDED;
+            case FOLLOW_UP_FETCH_BY_WHERE, FOLLOW_UP_FETCH_UNSAFE ->
+                    ReadAfterWriteSafety.COLLISION_PRONE;
+        };
+    }
 }

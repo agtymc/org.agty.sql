@@ -2,8 +2,26 @@
 
 ## Unreleased
 
+### Changed
+- GitHub Actions were updated to checkout `7.0.1`, setup-java `6.0.0`, and attest-build-provenance `4.2.2`, with every action still pinned by commit SHA.
+- Build and test tooling was updated to Maven Dependency Plugin `3.11.0` and Surefire `3.6.0`; the optional SQLite JDBC driver was updated to `3.53.4.0`.
+- The test suite now uses JUnit Jupiter `6.1.3` on the Java 21 baseline.
+- Maven Wrapper now downloads Maven `3.9.16` and enforces its SHA-256 digest; the digest was computed only after the archive matched Maven Central's published SHA-512 value.
+- Query logging now uses a bounded process-wide asynchronous writer, keeping file creation, rotation, and UTF-8 writes out of JDBC hot paths; saturated queues drop the new log entry and background file/runtime failures are reported through the facade error accumulator without stopping the worker.
+- Facade-owned cursor and raw `ResultSet` lifecycle tracking was isolated from `AgtySQL` into a dedicated internal resource component without changing the public API.
+- `Arguments` now delegates paired legacy/prepared value storage and runtime scalar normalization to focused internal components while preserving all `2.x` overloads and insertion order.
+- `RowData` now delegates number, boolean, and temporal coercion to a stateless internal converter while retaining the existing `SqlRow` API and conversion behavior.
+
+### Added
+- `ReadAfterWriteSafety` and capability methods now expose whether generated-ID, `insertAndGet`, and `updateAndGet` flows are atomic, connection-scoped, transaction-guarded, collision-prone, or unsupported; the six-driver matrix is documented explicitly.
+
+### Testing
+- JMH now includes an eight-thread saturated-pool scenario with separate successful-borrow and timeout event counters.
+
 ### Fixed
 - Release checksum manifests now use flat asset filenames, so a downloaded bundle can be verified directly with `sha256sum --check SHA256SUMS`.
+- Javadoc now fails the build on malformed documentation while excluding only legacy missing-comment diagnostics from doclint, eliminating the previous capped warning stream without weakening markup and reference validation.
+- Maven distribution verification now uses the `distributionSha256Sum` property implemented by both wrapper scripts instead of the previously ignored `distributionSha512Sum` property.
 
 ## 2.1.0 - 2026-09-05
 

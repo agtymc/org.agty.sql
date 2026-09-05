@@ -2,19 +2,18 @@
 
 Write-return behavior depends on `DialectCapabilities`.
 
-At the current stage, the project fixes the following:
+The public `ReadAfterWriteSafety` enum distinguishes atomic, connection-scoped,
+transaction-guarded, collision-prone, and unsupported behavior. The current
+matrix is:
 
-- PostgreSQL: native returning;
-- MySQL: follow-up fetch for `insertAndGet()`;
-- MariaDB: follow-up fetch for `insertAndGet()`;
-- SQLite: follow-up fetch for `insertAndGet()`;
-- H2: follow-up fetch for `insertAndGet()` through a collision-prone last-ID
-  fallback;
-- PostgreSQL: `UpdateAndGetStrategy.NATIVE_RETURNING`;
-- MySQL: `UpdateAndGetStrategy.FOLLOW_UP_FETCH_BY_WHERE`;
-- MariaDB: `UpdateAndGetStrategy.FOLLOW_UP_FETCH_BY_WHERE`;
-- SQLite: `UpdateAndGetStrategy.FOLLOW_UP_FETCH_BY_WHERE`;
-- H2: `UpdateAndGetStrategy.FOLLOW_UP_FETCH_BY_WHERE`.
+| Driver | Schema | Storage | Last ID | `insertAndGet()` | `updateAndGet()` |
+|---|---:|---|---|---|---|
+| PostgreSQL | yes | server | connection-scoped sequence function | native / atomic | native / atomic |
+| SQL Server | yes | server | connection-scoped function | native / atomic | native / atomic |
+| MySQL | no | server | connection-scoped function | follow-up / transaction-guarded | follow-up by WHERE / collision-prone |
+| MariaDB | no | server | connection-scoped function | follow-up / transaction-guarded | follow-up by WHERE / collision-prone |
+| SQLite | no | file | connection-scoped function | follow-up / transaction-guarded | follow-up by WHERE / collision-prone |
+| H2 | yes | file | last-row fallback / collision-prone | follow-up / collision-prone | follow-up by WHERE / collision-prone |
 
 Practical meaning:
 
@@ -22,6 +21,8 @@ Practical meaning:
 - for `updateAndGet()`, the library now distinguishes not only
   support/no-support but also the exact follow-up path;
 - `setReturnLastInsertId(true)` also depends on the ID-resolution strategy;
+- applications can inspect `lastInsertIdSafety()`, `insertAndGetSafety()`, and
+  `updateAndGetSafety()` before selecting a portable flow;
 - some strategies are native/session-safe;
 - some strategies are emulated;
 - for H2, the insert-return scenario must currently be treated as

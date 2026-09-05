@@ -25,7 +25,6 @@ import org.agty.sql.operations.UpdateOperation;
 import org.agty.sql.support.DebugMessages;
 import org.agty.sql.support.Errors;
 import org.agty.sql.support.Logger;
-import org.agty.sql.support.ManagedResultSet;
 import org.agty.sql.support.RowFactory;
 import org.agty.sql.support.SqlTextUtils;
 import org.agty.sql.support.SqlIdentifierValidator;
@@ -37,8 +36,6 @@ import java.sql.*;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Main session-like facade of the library.
@@ -93,8 +90,8 @@ public class AgtySQL implements AutoCloseable {
 
     /** Данные для list() */
     private final List<ListResultSet> listResultSetPool = new ArrayList<>();
-    private final Set<ResultSet> managedResultSets = ConcurrentHashMap.newKeySet();
-    private final Set<AgtySqlCursor> managedCursors = ConcurrentHashMap.newKeySet();
+    private final AgtySqlResourceTracker resourceTracker = new AgtySqlResourceTracker();
+    private final AsyncQueryLogWriter queryLogWriter = AsyncQueryLogWriter.shared();
 
     /**
      * Constructor.
@@ -443,8 +440,10 @@ public class AgtySQL implements AutoCloseable {
     public void close() {
         try {
             closeListCursors();
-            closeManagedCursors();
-            closeManagedResultSets();
+            resourceTracker.closeAll(exception -> setAndLogError(
+                    "AgtySQL.close()",
+                    exception.getMessage()
+            ));
             sessionSupport.close();
             clearErrors();
         } catch (SQLException e) {
@@ -453,46 +452,11 @@ public class AgtySQL implements AutoCloseable {
     }
 
     private ResultSet manage(ResultSet resultSet, Statement statement) {
-        ResultSet managed = ManagedResultSet.wrap(
-                resultSet,
-                statement,
-                managedResultSets::remove
-        );
-        managedResultSets.add(managed);
-        return managed;
+        return resourceTracker.manage(resultSet, statement);
     }
 
     AgtySqlCursor createManagedCursor(ResultSet resultSet, Arguments arguments) {
-        if (resultSet == null) {
-            return null;
-        }
-        AgtySqlCursor cursor = new AgtySqlCursor(
-                resultSet,
-                arguments,
-                managedCursors::remove
-        );
-        managedCursors.add(cursor);
-        return cursor;
-    }
-
-    private void closeManagedCursors() {
-        for (AgtySqlCursor cursor : List.copyOf(managedCursors)) {
-            try {
-                cursor.close();
-            } catch (RuntimeException exception) {
-                setAndLogError("AgtySQL.close()", exception.getMessage());
-            }
-        }
-    }
-
-    private void closeManagedResultSets() {
-        for (ResultSet resultSet : Set.copyOf(managedResultSets)) {
-            try {
-                resultSet.close();
-            } catch (SQLException exception) {
-                setAndLogError("AgtySQL.close()", exception.getMessage());
-            }
-        }
+        return resourceTracker.createCursor(resultSet, arguments);
     }
 
     private void closeAfterFailure(Statement statement, Exception failure) {
@@ -542,10 +506,15 @@ public class AgtySQL implements AutoCloseable {
         lastQuery = diagnosticQuery;
 
         if (getConfig().isLogQuery()) {
-            try {
-                new Logger(getConfig().getLogQueryFileOrDefault("logs/query.log")).append(diagnosticQuery);
-            } catch (IOException e) {
-                throwError("AgtySQL.logQuery()", e);
+            IOException previousFailure = queryLogWriter.pollFailure();
+            if (previousFailure != null) {
+                errors.addError("AgtySQL.logQuery()", previousFailure.getMessage());
+            }
+            if (!queryLogWriter.append(
+                    getConfig().getLogQueryFileOrDefault("logs/query.log"),
+                    diagnosticQuery
+            )) {
+                errors.addError("AgtySQL.logQuery()", "Query log queue is full; entry was dropped");
             }
         }
     }

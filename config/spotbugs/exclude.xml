@@ -15,6 +15,7 @@
         <Or>
             <Class name="org.agty.sql.base.RowData"/>
             <Class name="org.agty.sql.base.RowDataEmpty"/>
+            <Class name="org.agty.sql.base.RowValueConverter"/>
             <Class name="org.agty.sql.dialect.emptysql.EmptySQL"/>
         </Or>
         <Bug pattern="NP_BOOLEAN_RETURN_NULL"/>

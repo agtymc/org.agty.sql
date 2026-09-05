@@ -2,18 +2,17 @@
 
 Поведение write-return сценариев зависит от `DialectCapabilities`.
 
-На текущем этапе в проекте зафиксировано следующее:
+Public enum `ReadAfterWriteSafety` различает atomic, connection-scoped,
+transaction-guarded, collision-prone и unsupported поведение. Текущая матрица:
 
-- PostgreSQL: native returning;
-- MySQL: follow-up fetch для `insertAndGet()`;
-- MariaDB: follow-up fetch для `insertAndGet()`;
-- SQLite: follow-up fetch для `insertAndGet()`;
-- H2: follow-up fetch для `insertAndGet()` через collision-prone last-id fallback;
-- PostgreSQL: `UpdateAndGetStrategy.NATIVE_RETURNING`;
-- MySQL: `UpdateAndGetStrategy.FOLLOW_UP_FETCH_BY_WHERE`;
-- MariaDB: `UpdateAndGetStrategy.FOLLOW_UP_FETCH_BY_WHERE`;
-- SQLite: `UpdateAndGetStrategy.FOLLOW_UP_FETCH_BY_WHERE`;
-- H2: `UpdateAndGetStrategy.FOLLOW_UP_FETCH_BY_WHERE`.
+| Драйвер | Schema | Хранилище | Last ID | `insertAndGet()` | `updateAndGet()` |
+|---|---:|---|---|---|---|
+| PostgreSQL | да | сервер | connection-scoped sequence function | native / atomic | native / atomic |
+| SQL Server | да | сервер | connection-scoped function | native / atomic | native / atomic |
+| MySQL | нет | сервер | connection-scoped function | follow-up / transaction-guarded | follow-up by WHERE / collision-prone |
+| MariaDB | нет | сервер | connection-scoped function | follow-up / transaction-guarded | follow-up by WHERE / collision-prone |
+| SQLite | нет | файл | connection-scoped function | follow-up / transaction-guarded | follow-up by WHERE / collision-prone |
+| H2 | да | файл | last-row fallback / collision-prone | follow-up / collision-prone | follow-up by WHERE / collision-prone |
 
 Практический смысл:
 
@@ -21,6 +20,8 @@
 - для `updateAndGet()` библиотека теперь различает не только
   support/no-support, а и форму follow-up path;
 - `setReturnLastInsertId(true)` тоже зависит от стратегии получения ID;
+- приложение может проверить `lastInsertIdSafety()`, `insertAndGetSafety()` и
+  `updateAndGetSafety()` перед выбором переносимого сценария;
 - часть стратегий являются native/session-safe;
 - часть стратегий являются emulated;
 - для H2 insert-return сценарий сейчас нужно считать collision-prone при

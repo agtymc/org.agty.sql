@@ -44,6 +44,9 @@ EXPECTED_BENCHMARKS=(
   "CorePathBenchmark.renderLegacyUpdate"
   "CorePathBenchmark.renderPreparedUpdate"
   "PooledDataSourceBenchmark.borrowSelectAndReturn"
+  "PooledDataSourceTimeoutBenchmark.borrowUnderSaturation"
+  '"successfulBorrows"'
+  '"timeouts"'
 )
 for benchmark in "${EXPECTED_BENCHMARKS[@]}"; do
   grep -Fq "${benchmark}" "${RESULT_FILE}" || {
@@ -51,3 +54,18 @@ for benchmark in "${EXPECTED_BENCHMARKS[@]}"; do
     exit 1
   }
 done
+
+awk '
+  /"successfulBorrows"[[:space:]]*:/ { metric = "successfulBorrows"; next }
+  /"timeouts"[[:space:]]*:/ { metric = "timeouts"; next }
+  metric != "" && /"score"[[:space:]]*:/ {
+    value = $3
+    gsub(/,/, "", value)
+    if (value + 0 > 0) seen[metric] = 1
+    metric = ""
+  }
+  END { exit !(seen["successfulBorrows"] && seen["timeouts"]) }
+' "${RESULT_FILE}" || {
+  echo "JMH timeout benchmark must report positive successfulBorrows and timeouts" >&2
+  exit 1
+}

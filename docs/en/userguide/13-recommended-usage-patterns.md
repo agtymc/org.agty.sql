@@ -36,6 +36,10 @@
 - Use separate `loginTimeoutSeconds` and `networkTimeoutMillis` values.
 - Keep `logQueryValues=false`. Query logs then redact string, numeric, and
   dollar-quoted literals; common credential assignments are always redacted.
+- Query-log writes are asynchronous and use a bounded process-wide queue. A
+  saturated queue drops the new diagnostic entry and records an `AgtySQL`
+  error instead of blocking JDBC execution; allow a short drain interval
+  before inspecting the file in operational tooling.
 - Use `${ENVIRONMENT_VARIABLE}` as the complete value of an ini credential, or
   construct `AgtySqlConfig` from a secret-manager result. Restrict a local
   `config.ini` to owner read/write permissions (`chmod 600 config.ini`).
