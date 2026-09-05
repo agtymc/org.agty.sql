@@ -81,7 +81,7 @@ jobs:
           for artifact in "${artifacts[@]}"; do
             test -f "${artifact}"
           done
-          sha256sum "${artifacts[@]}" > target/SHA256SUMS
+          sha256sum "${artifacts[@]}" | sed 's#  .*/#  #' > target/SHA256SUMS
 
       - name: Attest release artifacts
         uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3

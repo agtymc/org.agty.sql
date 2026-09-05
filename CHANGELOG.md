@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Fixed
+- Release checksum manifests now use flat asset filenames, so a downloaded bundle can be verified directly with `sha256sum --check SHA256SUMS`.
+
 ## 2.1.0 - 2026-09-05
 
 ### Added
