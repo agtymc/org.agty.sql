@@ -33,8 +33,8 @@ jobs:
           distribution: temurin
           java-version: '21'
           server-id: org.agty.sql
-          server-username: GITHUB_ACTOR
-          server-password: GITHUB_TOKEN
+          server-username-env-var: GITHUB_ACTOR
+          server-password-env-var: GITHUB_TOKEN
 
       - name: Verify signed tag and release metadata
         run: |

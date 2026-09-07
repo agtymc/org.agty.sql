@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Changed
+- The release workflow now uses the current `actions/setup-java` Maven credential environment-variable inputs, removing deprecated-input warnings without changing credential handling.
+
 ## 2.2.0 - 2026-09-07
 
 ### Changed
