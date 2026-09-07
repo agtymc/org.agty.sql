@@ -6,6 +6,9 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 
+/**
+ * Provides pool db config factory behavior.
+ */
 public final class PoolDbConfigFactory {
 
     private static final Map<String, Supplier<AgtySqlConfig>> PROVIDERS = new ConcurrentHashMap<>();
@@ -13,6 +16,11 @@ public final class PoolDbConfigFactory {
     private PoolDbConfigFactory() {
     }
 
+    /**
+     * Performs the register operation.
+     * @param poolName parameter value
+     * @param provider parameter value
+     */
     public static void register(String poolName, Supplier<AgtySqlConfig> provider) {
         String key = normalize(poolName);
         if (provider == null) {
@@ -21,6 +29,11 @@ public final class PoolDbConfigFactory {
         PROVIDERS.put(key, provider);
     }
 
+    /**
+     * Returns the config.
+     * @param poolName parameter value
+     * @return operation result
+     */
     public static AgtySqlConfig getConfig(String poolName) {
         String key = normalize(poolName);
         Supplier<AgtySqlConfig> provider = PROVIDERS.get(key);

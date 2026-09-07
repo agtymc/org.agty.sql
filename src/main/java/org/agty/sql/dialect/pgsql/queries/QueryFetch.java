@@ -11,6 +11,10 @@ import org.agty.sql.sqlbuilder.QuerySelectBuilder;
 public class QueryFetch extends SqlQuery<QueryFetch> implements SqlQueries {
     private String query;
 
+    /**
+     * Creates a new instance.
+     * @param arguments parameter value
+     */
     public QueryFetch(Arguments arguments) {
         setArguments(arguments);
     }

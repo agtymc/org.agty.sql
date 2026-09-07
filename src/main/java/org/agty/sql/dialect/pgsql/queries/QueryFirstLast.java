@@ -13,15 +13,27 @@ public class QueryFirstLast extends SqlQuery<QueryFirstLast> implements SqlQueri
 
     private boolean getLast = false;
 
+    /**
+     * Creates a new instance.
+     * @param arguments parameter value
+     */
     public QueryFirstLast(Arguments arguments) {
         setArguments(arguments);
     }
 
+    /**
+     * Returns the last.
+     * @return operation result
+     */
     public QueryFirstLast getLast() {
         this.getLast = true;
         return this;
     }
 
+    /**
+     * Returns the first.
+     * @return operation result
+     */
     public QueryFirstLast getFirst() {
         this.getLast = false;
         return this;

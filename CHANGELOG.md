@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 2.2.0 - 2026-09-07
+
 ### Changed
 - GitHub Actions were updated to checkout `7.0.1`, setup-java `6.0.0`, and attest-build-provenance `4.2.2`, with every action still pinned by commit SHA.
 - Build and test tooling was updated to Maven Dependency Plugin `3.11.0` and Surefire `3.6.0`; the optional SQLite JDBC driver was updated to `3.53.4.0`.
@@ -14,13 +16,17 @@
 
 ### Added
 - `ReadAfterWriteSafety` and capability methods now expose whether generated-ID, `insertAndGet`, and `updateAndGet` flows are atomic, connection-scoped, transaction-guarded, collision-prone, or unsupported; the six-driver matrix is documented explicitly.
+- `DialectFeatureSet` now exposes an extensible six-driver matrix for delete-returning, UPSERT, locking reads, JDBC batch/generated keys, positional parameters, and named parameters without changing the existing `DialectCapabilities` record constructor.
 
 ### Testing
 - JMH now includes an eight-thread saturated-pool scenario with separate successful-borrow and timeout event counters.
+- JMH smoke and full runs now enforce broad same-run performance ratios instead of host-specific absolute timings, providing a portable regression budget for shared CI runners.
+- Deterministic pool fault-injection tests now cover initial outage, an active network interruption, repeated database restarts, stale-handle rejection, and subsequent physical-connection recovery.
+- The release gate now compiles a legacy CRUD client against the 2.0.4 JAR and executes those unchanged bytecodes against the current 2.x JAR, covering deprecated compatibility aliases in addition to japicmp checks.
 
 ### Fixed
 - Release checksum manifests now use flat asset filenames, so a downloaded bundle can be verified directly with `sha256sum --check SHA256SUMS`.
-- Javadoc now fails the build on malformed documentation while excluding only legacy missing-comment diagnostics from doclint, eliminating the previous capped warning stream without weakening markup and reference validation.
+- Javadoc now runs full doclint and fails the build on every warning; all previously reported missing-comment, malformed-markup, and incomplete-tag diagnostics have been resolved.
 - Maven distribution verification now uses the `distributionSha256Sum` property implemented by both wrapper scripts instead of the previously ignored `distributionSha512Sum` property.
 
 ## 2.1.0 - 2026-09-05

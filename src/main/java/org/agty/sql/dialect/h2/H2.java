@@ -4,6 +4,9 @@ import org.agty.sql.AgtySQL;
 import org.agty.sql.data.Arguments;
 import org.agty.sql.data.SqlExpression;
 import org.agty.sql.driver.DialectCapabilities;
+import org.agty.sql.driver.DialectFeature;
+import org.agty.sql.driver.DialectFeatureSet;
+import org.agty.sql.driver.DialectFeatureSupport;
 import org.agty.sql.driver.LastInsertIdStrategy;
 import org.agty.sql.driver.UpdateAndGetStrategy;
 import org.agty.sql.driver.WriteReturnStrategy;
@@ -12,10 +15,17 @@ import org.agty.sql.interfaces.SqlRow;
 
 import java.util.Locale;
 
+/**
+ * Provides h2 behavior.
+ */
 public class H2 extends MySQL {
 
     private static final String DRIVER = "h2";
 
+    /**
+     * Creates a new instance.
+     * @param agtySQL parameter value
+     */
     public H2(AgtySQL agtySQL) {
         super(agtySQL);
     }
@@ -34,6 +44,17 @@ public class H2 extends MySQL {
                 WriteReturnStrategy.FOLLOW_UP_FETCH,
                 UpdateAndGetStrategy.FOLLOW_UP_FETCH_BY_WHERE
         );
+    }
+
+    @Override
+    public DialectFeatureSet getFeatureSet() {
+        return DialectFeatureSet.builder()
+                .support(DialectFeature.UPSERT, DialectFeatureSupport.ALTERNATIVE_SYNTAX)
+                .support(DialectFeature.SELECT_FOR_UPDATE, DialectFeatureSupport.SUPPORTED)
+                .support(DialectFeature.JDBC_BATCH, DialectFeatureSupport.JDBC_DRIVER)
+                .support(DialectFeature.JDBC_GENERATED_KEYS, DialectFeatureSupport.JDBC_DRIVER)
+                .support(DialectFeature.POSITIONAL_PARAMETERS, DialectFeatureSupport.JDBC_DRIVER)
+                .build();
     }
 
     @Override

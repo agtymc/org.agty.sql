@@ -10,9 +10,20 @@ import org.agty.sql.support.RowFactory;
 
 import java.lang.reflect.InvocationTargetException;
 
+/**
+ * Provides model control behavior.
+ */
 public class ModelControl {
+    /** Creates a new ModelControl instance. */
+    public ModelControl() {
+    }
+
     private final ColumnEntity idColumn = new ColumnEntity();
 
+    /**
+     * Performs the new model control operation.
+     * @return operation result
+     */
     public static ModelControl newModelControl() {
         return new ModelControl();
     }

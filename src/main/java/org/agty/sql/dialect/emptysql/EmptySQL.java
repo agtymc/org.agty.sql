@@ -8,7 +8,14 @@ import org.agty.sql.data.Arguments;
 import java.sql.ResultSet;
 import java.util.ArrayList;
 
+/**
+ * Provides empty sql behavior.
+ */
 public class EmptySQL implements Sql {
+    /**
+     * Creates a new instance.
+     * @param agtySQL parameter value
+     */
     public EmptySQL(AgtySQL agtySQL) {}
 
     @Override
@@ -156,7 +163,7 @@ public class EmptySQL implements Sql {
      * Update a row and get a result
      *
      * @param arguments Arguments
-     * @param fields
+     * @param fields comma-separated fields to return
      * @return ResultSet
      */
     @Override

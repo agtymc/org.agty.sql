@@ -3,8 +3,14 @@ package org.agty.sql.dialect.pgsql.fields;
 import org.agty.sql.base.Field;
 import org.agty.sql.base.FieldsType;
 
+/**
+ * Provides pg sql fields type behavior.
+ */
 public class PgSqlFieldsType extends FieldsType {
 
+    /**
+     * Creates a new instance.
+     */
     public PgSqlFieldsType() {
         fill();
     }

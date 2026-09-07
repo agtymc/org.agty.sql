@@ -17,11 +17,20 @@ public class AgtySqlConnection {
     private final AgtySqlConfig agtySqlConfig;
     private final String driver;
 
+    /**
+     * Creates a new instance.
+     * @param agtySqlConfig parameter value
+     * @param driver parameter value
+     */
     public AgtySqlConnection(AgtySqlConfig agtySqlConfig, String driver) {
         this.agtySqlConfig = agtySqlConfig;
         this.driver = driver;
     }
 
+    /**
+     * Returns the config.
+     * @return operation result
+     */
     public AgtySqlConfig getConfig() {
         return agtySqlConfig;
     }
@@ -30,6 +39,11 @@ public class AgtySqlConnection {
         return driver;
     }
 
+    /**
+     * Returns the connection.
+     * @return operation result
+     * @throws SQLException if the operation cannot be completed
+     */
     public Connection getConnection() throws SQLException {
         String connectionUri = getConnectionURI();
         debugMessage(connectionUri);

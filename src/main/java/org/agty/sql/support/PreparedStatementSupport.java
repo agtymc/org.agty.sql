@@ -22,6 +22,12 @@ public final class PreparedStatementSupport {
     private PreparedStatementSupport() {
     }
 
+    /**
+     * Performs the bind operation.
+     * @param statement parameter value
+     * @param parameters parameter value
+     * @throws SQLException if the operation cannot be completed
+     */
     public static void bind(PreparedStatement statement, List<?> parameters) throws SQLException {
         for (int i = 0; i < parameters.size(); i++) {
             Object value = parameters.get(i);
@@ -50,6 +56,15 @@ public final class PreparedStatementSupport {
         }
     }
 
+    /**
+     * Performs the execute query operation.
+     * @param sql parameter value
+     * @param query parameter value
+     * @param parameters parameter value
+     * @param noRebuildQuery parameter value
+     * @param errorType parameter value
+     * @return operation result
+     */
     public static ResultSet executeQuery(
             AgtySQL sql,
             String query,
@@ -75,12 +90,23 @@ public final class PreparedStatementSupport {
         }
     }
 
+    /**
+     * Performs the read parameters operation.
+     * @param arguments parameter value
+     * @return operation result
+     */
     public static List<Object> readParameters(Arguments arguments) {
         return arguments.hasQuery()
                 ? arguments.getQueryParameters()
                 : arguments.getWhereParameters();
     }
 
+    /**
+     * Performs the read query arguments operation.
+     * @param source parameter value
+     * @param query parameter value
+     * @return operation result
+     */
     public static Arguments readQueryArguments(Arguments source, String query) {
         Arguments target = Arguments.builder()
                 .useStatementPrepare(source.useStatementPrepare())
@@ -97,12 +123,22 @@ public final class PreparedStatementSupport {
         return target;
     }
 
+    /**
+     * Performs the insert parameters operation.
+     * @param arguments parameter value
+     * @return operation result
+     */
     public static List<Object> insertParameters(Arguments arguments) {
         return arguments.hasQuery()
                 ? arguments.getQueryParameters()
                 : arguments.getDataValues();
     }
 
+    /**
+     * Performs the insert parameters operation.
+     * @param arguments parameter value
+     * @return operation result
+     */
     public static List<Object> insertParameters(List<Arguments> arguments) {
         List<Object> parameters = new ArrayList<>();
         for (Arguments item : arguments) {
@@ -111,6 +147,11 @@ public final class PreparedStatementSupport {
         return parameters;
     }
 
+    /**
+     * Performs the update parameters operation.
+     * @param arguments parameter value
+     * @return operation result
+     */
     public static List<Object> updateParameters(Arguments arguments) {
         if (arguments.hasQuery()) {
             return arguments.getQueryParameters();

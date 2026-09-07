@@ -15,14 +15,26 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Map;
 
+/**
+ * Provides insert operation behavior.
+ */
 public final class InsertOperation {
 
     private final AgtySqlOperationSupport support;
 
+    /**
+     * Creates a new instance.
+     * @param support parameter value
+     */
     public InsertOperation(AgtySqlOperationSupport support) {
         this.support = support;
     }
 
+    /**
+     * Performs the insert operation.
+     * @param arguments parameter value
+     * @return operation result
+     */
     public long insert(Arguments arguments) {
         if (arguments.returnLastInsertId() && !support.getDialectCapabilities().supportsLastInsertId()) {
             support.throwError(
@@ -176,10 +188,22 @@ public final class InsertOperation {
         return null;
     }
 
+    /**
+     * Performs the insert and get operation.
+     * @param arguments parameter value
+     * @param fields parameter value
+     * @return operation result
+     */
     public SqlRow insertAndGet(Arguments arguments, String fields) {
         return insertAndGetValidated(arguments, SqlIdentifierValidator.requireFieldList(fields));
     }
 
+    /**
+     * Performs the insert and get operation.
+     * @param arguments parameter value
+     * @param fields parameter value
+     * @return operation result
+     */
     public SqlRow insertAndGet(Arguments arguments, SqlExpression fields) {
         return insertAndGetValidated(arguments, requireExpression(fields, "RETURNING fields"));
     }
@@ -342,6 +366,10 @@ public final class InsertOperation {
         arguments.addData(key, value);
     }
 
+    /**
+     * Performs the insert operation.
+     * @param arguments parameter value
+     */
     public void insert(ArrayList<Arguments> arguments) {
         String query = support.getDriverSqlObject().insertQuery(arguments);
         boolean prepared = arguments.stream().anyMatch(Arguments::useStatementPrepare);

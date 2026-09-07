@@ -44,6 +44,15 @@ public final class AgtySqlPooledDataSource implements DataSource, AutoCloseable 
     private volatile PrintWriter logWriter;
     private volatile int loginTimeout;
 
+    /**
+     * Creates a new instance.
+     * @param config parameter value
+     * @param maxPoolSize parameter value
+     * @param minIdle parameter value
+     * @param connectionTimeoutMillis parameter value
+     * @param idleTimeoutMillis parameter value
+     * @param maxLifetimeMillis parameter value
+     */
     public AgtySqlPooledDataSource(
             AgtySqlConfig config,
             int maxPoolSize,
@@ -62,6 +71,15 @@ public final class AgtySqlPooledDataSource implements DataSource, AutoCloseable 
         );
     }
 
+    /**
+     * Creates a new instance.
+     * @param config parameter value
+     * @param maxPoolSize parameter value
+     * @param minIdle parameter value
+     * @param connectionTimeout parameter value
+     * @param idleTimeout parameter value
+     * @param maxLifetime parameter value
+     */
     public AgtySqlPooledDataSource(
             AgtySqlConfig config,
             int maxPoolSize,
@@ -117,28 +135,52 @@ public final class AgtySqlPooledDataSource implements DataSource, AutoCloseable 
         ));
     }
 
+    /**
+     * Returns the config.
+     * @return operation result
+     */
     public AgtySqlConfig getConfig() {
         return AgtySqlConfig.getClone(config);
     }
 
+    /**
+     * Returns the max pool size.
+     * @return operation result
+     */
     public int getMaxPoolSize() {
         return maxPoolSize;
     }
 
+    /**
+     * Returns the min idle.
+     * @return operation result
+     */
     public int getMinIdle() {
         return minIdle;
     }
 
+    /**
+     * Returns the total connections.
+     * @return operation result
+     */
     public int getTotalConnections() {
         HikariPoolMXBean pool = dataSource.getHikariPoolMXBean();
         return pool == null ? 0 : pool.getTotalConnections();
     }
 
+    /**
+     * Returns the idle connections.
+     * @return operation result
+     */
     public int getIdleConnections() {
         HikariPoolMXBean pool = dataSource.getHikariPoolMXBean();
         return pool == null ? 0 : pool.getIdleConnections();
     }
 
+    /**
+     * Returns the active connections.
+     * @return operation result
+     */
     public int getActiveConnections() {
         return activeHandles.size();
     }

@@ -14,15 +14,28 @@ public class QueryInsert extends SqlQuery<QueryInsert> implements SqlQueries {
 
     private InsertData insertData;
 
+    /**
+     * Creates a new instance.
+     * @param arguments parameter value
+     */
     public QueryInsert(Arguments arguments) {
         setArguments(arguments);
     }
 
+    /**
+     * Sets the insert data.
+     * @param insertData parameter value
+     * @return operation result
+     */
     public QueryInsert setInsertData(InsertData insertData) {
         this.insertData = insertData;
         return this;
     }
 
+    /**
+     * Returns the insert data.
+     * @return operation result
+     */
     public InsertData getInsertData() {
         return insertData;
     }

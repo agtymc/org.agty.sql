@@ -6,6 +6,9 @@ package org.agty.sql.config;
  * (driver, server, user, password, etc.)
  */
 public class AgtySqlConfigInit {
+    /**
+     * Defines the default config path value.
+     */
     public static final String DEFAULT_CONFIG_PATH = "config.ini";
 
     private AgtySqlConfig agtySqlConfig;

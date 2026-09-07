@@ -15,6 +15,19 @@ matrix is:
 | SQLite | no | file | connection-scoped function | follow-up / transaction-guarded | follow-up by WHERE / collision-prone |
 | H2 | yes | file | last-row fallback / collision-prone | follow-up / collision-prone | follow-up by WHERE / collision-prone |
 
+Extended engine/JDBC building blocks are exposed separately through
+`AgtySQL.getDialectFeatureSet()`. They describe what can be built with direct
+or low-level SQL; they do not imply a dedicated high-level library method.
+
+| Driver | Delete rows and return them | UPSERT | Locking read | Batch / generated keys / `?` | Named parameters |
+|---|---|---|---|---|---|
+| PostgreSQL | supported (`RETURNING`) | supported (`ON CONFLICT`) | supported | JDBC driver | unsupported |
+| SQL Server | alternative syntax (`OUTPUT DELETED`) | alternative syntax (`MERGE`) | alternative syntax (locking hints) | JDBC driver | unsupported |
+| MySQL | unsupported | alternative syntax (`ON DUPLICATE KEY`) | supported | JDBC driver | unsupported |
+| MariaDB | supported (`RETURNING`, single-table delete) | alternative syntax (`ON DUPLICATE KEY`) | supported | JDBC driver | unsupported |
+| SQLite | supported (`RETURNING`) | supported (`ON CONFLICT`) | unsupported | JDBC driver | unsupported |
+| H2 | unsupported | alternative syntax (`MERGE`) | supported | JDBC driver | unsupported |
+
 Practical meaning:
 
 - `insertAndGet()` and `updateAndGet()` depend on the dialect strategy;

@@ -10,30 +10,60 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.Date;
 
+/**
+ * Provides object builder behavior.
+ */
 public class ObjectBuilder {
+    /** Creates a new ObjectBuilder instance. */
+    public ObjectBuilder() {
+    }
+
     private Object object;
     private Class<?> clazz;
     private SqlRow sqlRow;
 
+    /**
+     * Performs the builder operation.
+     * @return operation result
+     */
     public static ObjectBuilder builder() {
         return new ObjectBuilder();
     }
 
+    /**
+     * Performs the object operation.
+     * @param object parameter value
+     * @return operation result
+     */
     public ObjectBuilder object(Object object) {
         this.object = object;
         return this;
     }
 
+    /**
+     * Performs the clazz operation.
+     * @param clazz parameter value
+     * @return operation result
+     */
     public ObjectBuilder clazz(Class<?> clazz) {
         this.clazz = clazz;
         return this;
     }
 
+    /**
+     * Performs the sql row operation.
+     * @param sqlRow parameter value
+     * @return operation result
+     */
     public ObjectBuilder sqlRow(SqlRow sqlRow) {
         this.sqlRow = sqlRow;
         return this;
     }
 
+    /**
+     * Performs the build operation.
+     * @return operation result
+     */
     public Object build() {
         Object newObjectInstance;
 

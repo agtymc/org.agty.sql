@@ -25,6 +25,11 @@ public final class AgtySqlCursor implements AutoCloseable {
     private boolean nextRowBuffered;
     private boolean closed;
 
+    /**
+     * Creates a new instance.
+     * @param resultSet parameter value
+     * @param arguments parameter value
+     */
     public AgtySqlCursor(ResultSet resultSet, Arguments arguments) {
         this(resultSet, arguments, null);
     }
@@ -39,18 +44,35 @@ public final class AgtySqlCursor implements AutoCloseable {
         this.closeCallback = closeCallback;
     }
 
+    /**
+     * Returns the result set.
+     * @return operation result
+     */
     public ResultSet getResultSet() {
         return resultSet;
     }
 
+    /**
+     * Returns the statement.
+     * @return operation result
+     * @throws SQLException if the operation cannot be completed
+     */
     public Statement getStatement() throws SQLException {
         return resultSet == null ? null : resultSet.getStatement();
     }
 
+    /**
+     * Returns whether closed.
+     * @return operation result
+     */
     public boolean isClosed() {
         return closed;
     }
 
+    /**
+     * Returns whether next.
+     * @return operation result
+     */
     public boolean hasNext() {
         if (closed || resultSet == null) {
             return false;
@@ -69,6 +91,10 @@ public final class AgtySqlCursor implements AutoCloseable {
         return true;
     }
 
+    /**
+     * Performs the next operation.
+     * @return operation result
+     */
     public SqlRow next() {
         if (closed || resultSet == null) {
             return null;

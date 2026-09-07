@@ -17,10 +17,25 @@ public class AgtySqlStatement {
     private final int fetchSize;
     private Statement stmt;
 
+    /**
+     * Creates a new instance.
+     * @param connection parameter value
+     * @param agtySqlConfig parameter value
+     * @param stmtRows parameter value
+     * @throws SQLException if the operation cannot be completed
+     */
     public AgtySqlStatement(Connection connection, AgtySqlConfig agtySqlConfig, int stmtRows) throws SQLException {
         this(connection, agtySqlConfig, stmtRows, 0);
     }
 
+    /**
+     * Creates a new instance.
+     * @param connection parameter value
+     * @param agtySqlConfig parameter value
+     * @param stmtRows parameter value
+     * @param fetchSize parameter value
+     * @throws SQLException if the operation cannot be completed
+     */
     public AgtySqlStatement(Connection connection, AgtySqlConfig agtySqlConfig, int stmtRows, int fetchSize) throws SQLException {
         this.connection = connection;
         this.agtySqlConfig = agtySqlConfig;
@@ -29,22 +44,42 @@ public class AgtySqlStatement {
         createStatement();
     }
 
+    /**
+     * Returns the config.
+     * @return operation result
+     */
     public AgtySqlConfig getConfig() {
         return agtySqlConfig;
     }
 
+    /**
+     * Returns the connection.
+     * @return operation result
+     */
     public Connection getConnection() {
         return connection;
     }
 
+    /**
+     * Returns the statement.
+     * @return operation result
+     */
     public Statement getStatement() {
         return stmt;
     }
 
+    /**
+     * Returns the stmt rows.
+     * @return operation result
+     */
     public int getStmtRows() {
         return stmtRows;
     }
 
+    /**
+     * Returns the fetch size.
+     * @return operation result
+     */
     public int getFetchSize() {
         return fetchSize;
     }

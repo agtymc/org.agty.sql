@@ -9,6 +9,7 @@ import org.agty.sql.connect.AgtySqlConnector;
 import org.agty.sql.data.SqlQueryRebuild;
 import org.agty.sql.data.ListResultSet;
 import org.agty.sql.driver.DialectCapabilities;
+import org.agty.sql.driver.DialectFeatureSet;
 import org.agty.sql.exceptions.AgtySqlException;
 import org.agty.sql.data.Arguments;
 import org.agty.sql.data.SqlExpression;
@@ -64,7 +65,7 @@ import java.util.List;
  */
 public class AgtySQL implements AutoCloseable {
     /** Version */
-    final public static String VERSION = "2.1.0";
+    final public static String VERSION = "2.2.0";
 
     /** Connection and statement*/
     private final AgtySqlConnector connector;
@@ -587,6 +588,15 @@ public class AgtySQL implements AutoCloseable {
      */
     public DialectCapabilities getDialectCapabilities() {
         return getDriverSqlObject().getCapabilities();
+    }
+
+    /**
+     * Returns extended SQL-engine and JDBC capabilities for the active dialect.
+     *
+     * @return immutable dialect feature set
+     */
+    public DialectFeatureSet getDialectFeatureSet() {
+        return getDriverSqlObject().getFeatureSet();
     }
 
     /**

@@ -3,8 +3,14 @@ package org.agty.sql.dialect.mysql.fields;
 import org.agty.sql.base.Field;
 import org.agty.sql.base.FieldsType;
 
+/**
+ * Provides my sql fields type behavior.
+ */
 public class MySqlFieldsType extends FieldsType {
 
+    /**
+     * Creates a new instance.
+     */
     public MySqlFieldsType() {
         fill();
     }

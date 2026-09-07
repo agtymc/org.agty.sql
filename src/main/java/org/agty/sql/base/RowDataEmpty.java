@@ -12,6 +12,10 @@ import java.util.Date;
  * Empty data row
  */
 public class RowDataEmpty implements SqlRow {
+    /** Creates a new RowDataEmpty instance. */
+    public RowDataEmpty() {
+    }
+
 
     /**
      * Конвертирует и возвращает SqlRow из Arguments

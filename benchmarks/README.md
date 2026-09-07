@@ -21,3 +21,9 @@ The versioned reference measurements are stored in `baselines/` together with th
 `CorePathBenchmark` measures legacy/prepared update rendering, structural query rebuilding, and common `RowData` conversions. `PooledDataSourceBenchmark` reports sampled latency for an eight-thread Hikari/H2 `borrow -> SELECT -> close` cycle.
 
 `PooledDataSourceTimeoutBenchmark` intentionally reserves one of two pooled connections and lets eight threads contend for the other. Its `successfulBorrows` and `timeouts` secondary counters expose timeout rate separately from aggregate throughput. This is a saturation diagnostic, not a production capacity target.
+
+Every smoke and full run also executes `package/check-benchmark-budget.sh`.
+The portable gate compares prepared rendering, query rebuilding, and row
+conversion with legacy rendering from the same JMH run. Absolute timings are
+kept only as environment-specific baselines; broad same-run ratios prevent
+major regressions without treating shared-runner CPU speed as stable.

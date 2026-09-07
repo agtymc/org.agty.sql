@@ -14,6 +14,19 @@ transaction-guarded, collision-prone и unsupported поведение. Теку
 | SQLite | нет | файл | connection-scoped function | follow-up / transaction-guarded | follow-up by WHERE / collision-prone |
 | H2 | да | файл | last-row fallback / collision-prone | follow-up / collision-prone | follow-up by WHERE / collision-prone |
 
+Расширенные возможности движка/JDBC доступны отдельно через
+`AgtySQL.getDialectFeatureSet()`. Они описывают строительные блоки для прямого
+или low-level SQL и не означают наличие отдельного high-level метода библиотеки.
+
+| Драйвер | Delete с возвратом строк | UPSERT | Locking read | Batch / generated keys / `?` | Named parameters |
+|---|---|---|---|---|---|
+| PostgreSQL | supported (`RETURNING`) | supported (`ON CONFLICT`) | supported | JDBC driver | unsupported |
+| SQL Server | alternative syntax (`OUTPUT DELETED`) | alternative syntax (`MERGE`) | alternative syntax (locking hints) | JDBC driver | unsupported |
+| MySQL | unsupported | alternative syntax (`ON DUPLICATE KEY`) | supported | JDBC driver | unsupported |
+| MariaDB | supported (`RETURNING`, single-table delete) | alternative syntax (`ON DUPLICATE KEY`) | supported | JDBC driver | unsupported |
+| SQLite | supported (`RETURNING`) | supported (`ON CONFLICT`) | unsupported | JDBC driver | unsupported |
+| H2 | unsupported | alternative syntax (`MERGE`) | supported | JDBC driver | unsupported |
+
 Практический смысл:
 
 - `insertAndGet()` и `updateAndGet()` зависят от стратегии диалекта;

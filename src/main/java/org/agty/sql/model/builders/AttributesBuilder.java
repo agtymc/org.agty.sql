@@ -10,7 +10,14 @@ import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * Provides attributes builder behavior.
+ */
 public class AttributesBuilder implements AttributesBuilderInterface {
+    /** Creates a new AttributesBuilder instance. */
+    public AttributesBuilder() {
+    }
+
     private String whereCondition;
     private String tableName;
     private String schemaName;

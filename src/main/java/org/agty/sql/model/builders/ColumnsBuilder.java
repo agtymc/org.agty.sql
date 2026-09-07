@@ -13,7 +13,14 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
+/**
+ * Provides columns builder behavior.
+ */
 public class ColumnsBuilder implements ColumnBuilderInterface {
+    /** Creates a new ColumnsBuilder instance. */
+    public ColumnsBuilder() {
+    }
+
     private boolean idFieldHasPresent = false;
     private String columnName;
 
@@ -24,7 +31,7 @@ public class ColumnsBuilder implements ColumnBuilderInterface {
      * Build an entity
      * @param entity Entity object
      * @param <T> Type of entity
-     * @throws IllegalAccessException
+     * @throws IllegalAccessException if a field value cannot be read from the entity
      */
     @Override
     public <T> void buildEntity(T entity) throws IllegalAccessException {

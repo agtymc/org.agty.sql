@@ -6,7 +6,7 @@
 
     <groupId>org.agty</groupId>
     <artifactId>org-agty-sql</artifactId>
-    <version>2.1.0</version>
+    <version>2.2.0</version>
     <name>org.agty.sql</name>
     <description>Lightweight Java SQL library with a high-level API, JDBC access, and cursor-style reading.</description>
     <url>https://github.com/agtymc/org.agty.sql</url>
@@ -171,10 +171,15 @@
                 <artifactId>maven-javadoc-plugin</artifactId>
                 <version>3.12.0</version>
                 <configuration>
-                    <doclint>all,-missing</doclint>
+                    <doclint>all</doclint>
                     <failOnWarnings>true</failOnWarnings>
                     <notimestamp>true</notimestamp>
                     <quiet>true</quiet>
+                    <show>public</show>
+                    <additionalJOptions>
+                        <additionalJOption>-Xmaxwarns</additionalJOption>
+                        <additionalJOption>2000</additionalJOption>
+                    </additionalJOptions>
                 </configuration>
                 <executions>
                     <execution>

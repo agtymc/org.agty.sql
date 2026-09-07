@@ -7,31 +7,61 @@ import org.agty.sql.model.SaveModelMode;
 import org.agty.sql.model.entity.ColumnEntity;
 import org.agty.sql.support.SqlIdentifierValidator;
 
+/**
+ * Provides model arguments builder behavior.
+ */
 public class ModelArgumentsBuilder {
+    /** Creates a new ModelArgumentsBuilder instance. */
+    public ModelArgumentsBuilder() {
+    }
+
     private ModelAttributes<?> model;
     private final Arguments arguments = Arguments.builder().useStatementPrepare(true);
     private SaveModelMode saveModelMode;
     private ColumnEntity idColumn;
 
+    /**
+     * Performs the builder operation.
+     * @return operation result
+     */
     public static ModelArgumentsBuilder builder() {
         return new ModelArgumentsBuilder();
     }
 
+    /**
+     * Performs the model operation.
+     * @param model parameter value
+     * @return operation result
+     */
     public ModelArgumentsBuilder model(ModelAttributes<?> model) {
         this.model = model;
         return this;
     }
 
+    /**
+     * Performs the save model mode operation.
+     * @param saveModelMode parameter value
+     * @return operation result
+     */
     public ModelArgumentsBuilder saveModelMode(SaveModelMode saveModelMode) {
         this.saveModelMode = saveModelMode;
         return this;
     }
 
+    /**
+     * Performs the id column operation.
+     * @param idColumn parameter value
+     * @return operation result
+     */
     public ModelArgumentsBuilder idColumn(ColumnEntity idColumn) {
         this.idColumn = idColumn;
         return this;
     }
 
+    /**
+     * Performs the build operation.
+     * @return operation result
+     */
     public Arguments build() {
         arguments.setTable(model.getModel().getTableName());
 

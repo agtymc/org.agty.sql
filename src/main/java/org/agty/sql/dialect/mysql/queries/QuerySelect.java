@@ -11,6 +11,10 @@ import org.agty.sql.sqlbuilder.QuerySelectBuilder;
 public class QuerySelect extends SqlQuery<QuerySelect> implements SqlQueries {
     private String query;
 
+    /**
+     * Creates a new instance.
+     * @param arguments parameter value
+     */
     public QuerySelect(Arguments arguments) {
         setArguments(arguments);
     }

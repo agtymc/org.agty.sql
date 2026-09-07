@@ -13,14 +13,26 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 
+/**
+ * Provides update operation behavior.
+ */
 public final class UpdateOperation {
 
     private final AgtySqlOperationSupport support;
 
+    /**
+     * Creates a new instance.
+     * @param support parameter value
+     */
     public UpdateOperation(AgtySqlOperationSupport support) {
         this.support = support;
     }
 
+    /**
+     * Performs the update operation.
+     * @param arguments parameter value
+     * @return operation result
+     */
     public boolean update(Arguments arguments) {
         String query = support.hasQuery(arguments)
                 ? arguments.getQuery()
@@ -43,10 +55,22 @@ public final class UpdateOperation {
         return !support.hasErrors();
     }
 
+    /**
+     * Performs the update and get operation.
+     * @param arguments parameter value
+     * @param fields parameter value
+     * @return operation result
+     */
     public SqlRow updateAndGet(Arguments arguments, String fields) {
         return updateAndGetValidated(arguments, SqlIdentifierValidator.requireFieldList(fields));
     }
 
+    /**
+     * Performs the update and get operation.
+     * @param arguments parameter value
+     * @param fields parameter value
+     * @return operation result
+     */
     public SqlRow updateAndGet(Arguments arguments, SqlExpression fields) {
         return updateAndGetValidated(arguments, requireExpression(fields, "RETURNING fields"));
     }

@@ -6,13 +6,13 @@
 
     <groupId>org.agty</groupId>
     <artifactId>org-agty-sql-benchmarks</artifactId>
-    <version>2.1.0</version>
+    <version>2.2.0</version>
     <packaging>jar</packaging>
 
     <properties>
         <maven.compiler.release>21</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <org.agty.sql.version>2.1.0</org.agty.sql.version>
+        <org.agty.sql.version>2.2.0</org.agty.sql.version>
         <jmh.version>1.37</jmh.version>
     </properties>
 

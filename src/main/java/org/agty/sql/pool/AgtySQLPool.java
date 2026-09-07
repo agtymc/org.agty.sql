@@ -42,6 +42,13 @@ public final class AgtySQLPool implements AutoCloseable {
     private final Set<PooledAgtySQL> activeLeases = ConcurrentHashMap.newKeySet();
     private final AtomicBoolean closed = new AtomicBoolean(false);
 
+    /**
+     * Creates a new instance.
+     * @param config parameter value
+     * @param maxPoolSize parameter value
+     * @param maxLifetime parameter value
+     * @param defaultBorrowTimeout parameter value
+     */
     public AgtySQLPool(
             AgtySqlConfig config,
             int maxPoolSize,
@@ -64,22 +71,50 @@ public final class AgtySQLPool implements AutoCloseable {
         this.dataSource = new HikariDataSource(createHikariConfig(maxLifetime));
     }
 
+    /**
+     * Creates a new instance.
+     * @param config parameter value
+     * @param maxPoolSize parameter value
+     * @param maxLifetime parameter value
+     */
     public AgtySQLPool(AgtySqlConfig config, int maxPoolSize, Duration maxLifetime) {
         this(config, maxPoolSize, maxLifetime, Duration.ofMillis(300));
     }
 
+    /**
+     * Creates a new instance.
+     * @param config parameter value
+     * @param maxPoolSize parameter value
+     */
     public AgtySQLPool(AgtySqlConfig config, int maxPoolSize) {
         this(config, maxPoolSize, 30);
     }
 
+    /**
+     * Creates a new instance.
+     * @param config parameter value
+     * @param maxPoolSize parameter value
+     * @param durationMinutes parameter value
+     */
     public AgtySQLPool(AgtySqlConfig config, int maxPoolSize, int durationMinutes) {
         this(config, maxPoolSize, Duration.ofMinutes(durationMinutes));
     }
 
+    /**
+     * Performs the borrow operation.
+     * @return operation result
+     * @throws SQLException if the operation cannot be completed
+     */
     public PooledAgtySQL borrow() throws SQLException {
         return borrow(defaultBorrowTimeout);
     }
 
+    /**
+     * Performs the borrow operation.
+     * @param timeout parameter value
+     * @return operation result
+     * @throws SQLException if the operation cannot be completed
+     */
     public PooledAgtySQL borrow(Duration timeout) throws SQLException {
         ensureOpen();
         Duration effectiveTimeout = timeout == null || timeout.isZero() || timeout.isNegative()
@@ -128,6 +163,12 @@ public final class AgtySQLPool implements AutoCloseable {
         }
     }
 
+    /**
+     * Performs the borrow extended operation.
+     * @param timeout parameter value
+     * @return operation result
+     * @throws SQLException if the operation cannot be completed
+     */
     public PooledAgtySQL borrowExtended(Duration timeout) throws SQLException {
         PooledAgtySQL lease = borrow(timeout == null ? defaultBorrowTimeout : timeout);
         if (lease.isHealthy()) {
@@ -137,7 +178,11 @@ public final class AgtySQLPool implements AutoCloseable {
         throw new SQLException("Borrowed connection is not healthy");
     }
 
-    /** Creates and validates up to {@code count} physical connections eagerly. */
+    /**
+     * Creates and validates up to {@code count} physical connections eagerly.
+     *
+     * @param count number of physical connections to validate
+     */
     public void preload(int count) {
         ensureOpen();
         int target = Math.max(0, Math.min(count, maxPoolSize));
@@ -277,6 +322,9 @@ public final class AgtySQLPool implements AutoCloseable {
         }
     }
 
+    /**
+     * Provides pooled agty sql behavior.
+     */
     public static final class PooledAgtySQL implements AutoCloseable {
         private final AgtySQL delegate;
         private final AgtySQLPool pool;
@@ -287,6 +335,10 @@ public final class AgtySQLPool implements AutoCloseable {
             this.pool = pool;
         }
 
+        /**
+         * Performs the sql operation.
+         * @return operation result
+         */
         public AgtySQL sql() {
             if (closed.get() || pool.closed.get()) {
                 throw new IllegalStateException("Pooled AgtySQL handle is closed");

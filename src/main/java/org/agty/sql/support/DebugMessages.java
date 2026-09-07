@@ -11,6 +11,11 @@ public final class DebugMessages {
     private DebugMessages() {
     }
 
+    /**
+     * Performs the print operation.
+     * @param type parameter value
+     * @param message parameter value
+     */
     public static void print(String type, String message) {
         SimpleDateFormat formatForDateNow = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss ");
         System.out.print(formatForDateNow.format(new Date()) + "|" + type + "| " + message + "\n");

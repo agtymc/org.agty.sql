@@ -4,7 +4,14 @@ import org.agty.sql.model.annotations.Table;
 
 import java.util.Locale;
 
+/**
+ * Provides table builder behavior.
+ */
 public class TableBuilder implements TableBuilderInterface {
+    /** Creates a new TableBuilder instance. */
+    public TableBuilder() {
+    }
+
     private String tableName;
 
     @Override

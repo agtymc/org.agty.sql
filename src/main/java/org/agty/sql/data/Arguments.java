@@ -666,11 +666,21 @@ public class Arguments {
         return this;
     }
 
+    /**
+     * Sets the limit.
+     * @param limit parameter value
+     * @return operation result
+     */
     public Arguments setLimit(int limit) {
         this.limit.setLimit(limit);
         return this;
     }
 
+    /**
+     * Sets the offset.
+     * @param offset parameter value
+     * @return operation result
+     */
     public Arguments setOffset(int offset) {
         this.limit.setOffset(offset);
         return this;

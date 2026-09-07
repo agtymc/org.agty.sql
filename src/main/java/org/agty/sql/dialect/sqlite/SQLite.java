@@ -4,16 +4,26 @@ import org.agty.sql.AgtySQL;
 import org.agty.sql.data.Arguments;
 import org.agty.sql.data.SqlExpression;
 import org.agty.sql.driver.DialectCapabilities;
+import org.agty.sql.driver.DialectFeature;
+import org.agty.sql.driver.DialectFeatureSet;
+import org.agty.sql.driver.DialectFeatureSupport;
 import org.agty.sql.driver.LastInsertIdStrategy;
 import org.agty.sql.driver.UpdateAndGetStrategy;
 import org.agty.sql.driver.WriteReturnStrategy;
 import org.agty.sql.dialect.mysql.MySQL;
 import org.agty.sql.interfaces.SqlRow;
 
+/**
+ * Provides sqlite behavior.
+ */
 public class SQLite extends MySQL {
 
     private static final String DRIVER = "sqlite";
 
+    /**
+     * Creates a new instance.
+     * @param agtySQL parameter value
+     */
     public SQLite(AgtySQL agtySQL) {
         super(agtySQL);
     }
@@ -32,6 +42,17 @@ public class SQLite extends MySQL {
                 WriteReturnStrategy.FOLLOW_UP_FETCH,
                 UpdateAndGetStrategy.FOLLOW_UP_FETCH_BY_WHERE
         );
+    }
+
+    @Override
+    public DialectFeatureSet getFeatureSet() {
+        return DialectFeatureSet.builder()
+                .support(DialectFeature.DELETE_RETURNING, DialectFeatureSupport.SUPPORTED)
+                .support(DialectFeature.UPSERT, DialectFeatureSupport.SUPPORTED)
+                .support(DialectFeature.JDBC_BATCH, DialectFeatureSupport.JDBC_DRIVER)
+                .support(DialectFeature.JDBC_GENERATED_KEYS, DialectFeatureSupport.JDBC_DRIVER)
+                .support(DialectFeature.POSITIONAL_PARAMETERS, DialectFeatureSupport.JDBC_DRIVER)
+                .build();
     }
 
     @Override

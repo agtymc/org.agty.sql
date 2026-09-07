@@ -1,10 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="${1:?Usage: package/gh-release.sh VERSION}"
+RELEASE_VERSION="2.2.0"
+VERSION="${1:-${RELEASE_VERSION}}"
 TAG="v${VERSION}"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${ROOT_DIR}"
+
+if [[ "${VERSION}" != "${RELEASE_VERSION}" ]]; then
+  echo "Release script is prepared for ${RELEASE_VERSION}, requested ${VERSION}" >&2
+  exit 1
+fi
 
 if [[ -n "$(git status --porcelain)" ]]; then
   echo "Release requires a clean Git worktree" >&2

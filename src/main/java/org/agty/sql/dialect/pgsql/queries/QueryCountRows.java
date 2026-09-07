@@ -11,6 +11,10 @@ import org.agty.sql.sqlbuilder.QuerySelectBuilder;
 public class QueryCountRows extends SqlQuery<QueryCountRows> implements SqlQueries {
     private String query;
 
+    /**
+     * Creates a new instance.
+     * @param arguments parameter value
+     */
     public QueryCountRows(Arguments arguments) {
         setArguments(arguments);
     }

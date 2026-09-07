@@ -32,3 +32,7 @@ BASELINE_JAR="${BASELINE_DIR}/target/org-agty-sql-${BASELINE_VERSION}.jar"
   -Djapicmp.baseline.jar="${BASELINE_JAR}" \
   "$@" \
   clean verify
+
+CURRENT_VERSION="$("${ROOT_DIR}/mvnw" -q help:evaluate -Dexpression=project.version -DforceStdout)"
+CURRENT_JAR="${ROOT_DIR}/target/org-agty-sql-${CURRENT_VERSION}.jar"
+"${ROOT_DIR}/package/run-2x-upgrade-test.sh" "${BASELINE_JAR}" "${CURRENT_JAR}"

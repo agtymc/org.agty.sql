@@ -12,6 +12,12 @@ public final class LegacySqlFormatter {
     private LegacySqlFormatter() {
     }
 
+    /**
+     * Performs the format operation.
+     * @param template parameter value
+     * @param arguments parameter value
+     * @return operation result
+     */
     public static String format(String template, Object... arguments) {
         if (template == null) {
             throw new IllegalArgumentException("Legacy SQL template must not be null");

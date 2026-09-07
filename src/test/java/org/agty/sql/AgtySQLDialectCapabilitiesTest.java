@@ -4,6 +4,9 @@ import org.agty.sql.dialect.DialectDriverRegistry;
 import org.agty.sql.config.AgtySqlConfig;
 import org.agty.sql.data.Arguments;
 import org.agty.sql.driver.DialectCapabilities;
+import org.agty.sql.driver.DialectFeature;
+import org.agty.sql.driver.DialectFeatureSet;
+import org.agty.sql.driver.DialectFeatureSupport;
 import org.agty.sql.driver.LastInsertIdStrategy;
 import org.agty.sql.driver.ReadAfterWriteSafety;
 import org.agty.sql.driver.UpdateAndGetStrategy;
@@ -164,6 +167,46 @@ class AgtySQLDialectCapabilitiesTest {
     }
 
     @Test
+    void exposesExtendedFeatureMatrixForEveryDialect() {
+        assertFeatures(
+                "pgsql",
+                DialectFeatureSupport.SUPPORTED,
+                DialectFeatureSupport.SUPPORTED,
+                DialectFeatureSupport.SUPPORTED
+        );
+        assertFeatures(
+                "mssql",
+                DialectFeatureSupport.ALTERNATIVE_SYNTAX,
+                DialectFeatureSupport.ALTERNATIVE_SYNTAX,
+                DialectFeatureSupport.ALTERNATIVE_SYNTAX
+        );
+        assertFeatures(
+                "mysql",
+                DialectFeatureSupport.UNSUPPORTED,
+                DialectFeatureSupport.ALTERNATIVE_SYNTAX,
+                DialectFeatureSupport.SUPPORTED
+        );
+        assertFeatures(
+                "mariadb",
+                DialectFeatureSupport.SUPPORTED,
+                DialectFeatureSupport.ALTERNATIVE_SYNTAX,
+                DialectFeatureSupport.SUPPORTED
+        );
+        assertFeatures(
+                "sqlite",
+                DialectFeatureSupport.SUPPORTED,
+                DialectFeatureSupport.SUPPORTED,
+                DialectFeatureSupport.UNSUPPORTED
+        );
+        assertFeatures(
+                "h2",
+                DialectFeatureSupport.UNSUPPORTED,
+                DialectFeatureSupport.ALTERNATIVE_SYNTAX,
+                DialectFeatureSupport.SUPPORTED
+        );
+    }
+
+    @Test
     void legacyCompatibilityClassesOutsideAgtySqlWereRemoved() {
         Assertions.assertThrows(ClassNotFoundException.class, () -> Class.forName("org.agty.sql.factory.DriverSqlFactory"));
         Assertions.assertThrows(ClassNotFoundException.class, () -> Class.forName("org.agty.sql.factory.RowFactory"));
@@ -237,5 +280,38 @@ class AgtySQLDialectCapabilitiesTest {
         public DialectCapabilities getDialectCapabilities() {
             return CAPABILITIES;
         }
+    }
+
+    private void assertFeatures(
+            String driver,
+            DialectFeatureSupport deleteReturning,
+            DialectFeatureSupport upsert,
+            DialectFeatureSupport selectForUpdate
+    ) {
+        DialectFeatureSet features = DialectDriverRegistry
+                .getDialect(driver, null)
+                .getFeatureSet();
+
+        Assertions.assertEquals(deleteReturning, features.support(DialectFeature.DELETE_RETURNING));
+        Assertions.assertEquals(upsert, features.support(DialectFeature.UPSERT));
+        Assertions.assertEquals(selectForUpdate, features.support(DialectFeature.SELECT_FOR_UPDATE));
+        Assertions.assertEquals(DialectFeatureSupport.JDBC_DRIVER, features.support(DialectFeature.JDBC_BATCH));
+        Assertions.assertEquals(
+                DialectFeatureSupport.JDBC_DRIVER,
+                features.support(DialectFeature.JDBC_GENERATED_KEYS)
+        );
+        Assertions.assertEquals(
+                DialectFeatureSupport.JDBC_DRIVER,
+                features.support(DialectFeature.POSITIONAL_PARAMETERS)
+        );
+        Assertions.assertEquals(
+                DialectFeatureSupport.UNSUPPORTED,
+                features.support(DialectFeature.NAMED_PARAMETERS)
+        );
+        Assertions.assertTrue(features.supports(DialectFeature.JDBC_BATCH));
+        Assertions.assertThrows(
+                UnsupportedOperationException.class,
+                () -> features.asMap().clear()
+        );
     }
 }

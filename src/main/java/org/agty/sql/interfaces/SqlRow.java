@@ -21,18 +21,26 @@ public interface SqlRow {
     /**
      * Все данные являются строкой
      * @return SqlRo
+     * @param isString parameter value
      */
     SqlRow setValuesAsString(Boolean isString);
+    /**
+     * Returns whether data stringified.
+     * @return operation result
+     */
     boolean isDataStringified();
 
     /**
      * @deprecated use {@link #setValuesAsString(Boolean)}
+     * @param isString parameter value
+     * @return operation result
      */
     @Deprecated
     SqlRow setDataIsString(Boolean isString);
 
     /**
      * @deprecated use {@link #isDataStringified()}
+     * @return operation result
      */
     @Deprecated
     boolean dataIsString();
@@ -42,6 +50,7 @@ public interface SqlRow {
      *
      * @param key имя столбца/данных.
      * @param value значение типа Object.
+     * @return operation result
      */
     SqlRow setData(String key, Object value);
 
@@ -174,6 +183,7 @@ public interface SqlRow {
      *
      * @param key имя ключа.
      * @return дата
+     * @param format parameter value
      */
     String getDateFormat(String key, String format);
 
@@ -199,6 +209,7 @@ public interface SqlRow {
 
     /**
      * @deprecated use {@link #isNotEmpty()}
+     * @return operation result
      */
     @Deprecated
     boolean noEmpty();

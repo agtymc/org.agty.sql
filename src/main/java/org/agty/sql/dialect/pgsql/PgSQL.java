@@ -4,6 +4,9 @@ import org.agty.sql.dialect.pgsql.queries.*;
 import org.agty.sql.data.Arguments;
 import org.agty.sql.data.InsertData;
 import org.agty.sql.driver.DialectCapabilities;
+import org.agty.sql.driver.DialectFeature;
+import org.agty.sql.driver.DialectFeatureSet;
+import org.agty.sql.driver.DialectFeatureSupport;
 import org.agty.sql.driver.LastInsertIdStrategy;
 import org.agty.sql.driver.UpdateAndGetStrategy;
 import org.agty.sql.driver.WriteReturnStrategy;
@@ -108,6 +111,18 @@ public class PgSQL implements Sql {
                 WriteReturnStrategy.NATIVE_RETURNING,
                 UpdateAndGetStrategy.NATIVE_RETURNING
         );
+    }
+
+    @Override
+    public DialectFeatureSet getFeatureSet() {
+        return DialectFeatureSet.builder()
+                .support(DialectFeature.DELETE_RETURNING, DialectFeatureSupport.SUPPORTED)
+                .support(DialectFeature.UPSERT, DialectFeatureSupport.SUPPORTED)
+                .support(DialectFeature.SELECT_FOR_UPDATE, DialectFeatureSupport.SUPPORTED)
+                .support(DialectFeature.JDBC_BATCH, DialectFeatureSupport.JDBC_DRIVER)
+                .support(DialectFeature.JDBC_GENERATED_KEYS, DialectFeatureSupport.JDBC_DRIVER)
+                .support(DialectFeature.POSITIONAL_PARAMETERS, DialectFeatureSupport.JDBC_DRIVER)
+                .build();
     }
 
     /**
@@ -487,7 +502,7 @@ public class PgSQL implements Sql {
      * Update a row and get a result
      *
      * @param arguments Arguments
-     * @param fields
+     * @param fields comma-separated fields to return
      * @return ResultSet
      */
     @Override

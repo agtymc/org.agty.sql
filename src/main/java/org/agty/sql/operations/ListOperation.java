@@ -12,14 +12,27 @@ import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.util.LinkedList;
 
+/**
+ * Provides list operation behavior.
+ */
 public final class ListOperation {
 
     private final AgtySqlOperationSupport support;
 
+    /**
+     * Creates a new instance.
+     * @param support parameter value
+     */
     public ListOperation(AgtySqlOperationSupport support) {
         this.support = support;
     }
 
+    /**
+     * Performs the list operation.
+     * @param arguments parameter value
+     * @param index parameter value
+     * @return operation result
+     */
     public SqlRow list(Arguments arguments, int index) {
         if (!support.hasListResultSet(index)) {
             createListResultSet(arguments, index);
@@ -33,6 +46,11 @@ public final class ListOperation {
         return getListData(index, arguments);
     }
 
+    /**
+     * Performs the open cursor operation.
+     * @param arguments parameter value
+     * @return operation result
+     */
     public AgtySqlCursor openCursor(Arguments arguments) {
         String query = support.hasQuery(arguments)
                 ? arguments.getQuery()
@@ -50,6 +68,11 @@ public final class ListOperation {
         );
     }
 
+    /**
+     * Performs the list array operation.
+     * @param arguments parameter value
+     * @return operation result
+     */
     public LinkedList<SqlRow> listArray(Arguments arguments) {
         LinkedList<SqlRow> list = new LinkedList<>();
         ResultSet resultSet = null;

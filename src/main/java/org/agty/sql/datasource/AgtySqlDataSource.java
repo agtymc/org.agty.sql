@@ -20,6 +20,10 @@ public class AgtySqlDataSource implements DataSource {
     private volatile PrintWriter logWriter;
     private volatile int loginTimeout;
 
+    /**
+     * Creates a new instance.
+     * @param config parameter value
+     */
     public AgtySqlDataSource(AgtySqlConfig config) {
         if (config == null) {
             throw new IllegalArgumentException("AgtySqlConfig must not be null");
@@ -28,6 +32,10 @@ public class AgtySqlDataSource implements DataSource {
         this.loginTimeout = config.getLoginTimeoutSeconds();
     }
 
+    /**
+     * Returns the config.
+     * @return operation result
+     */
     public AgtySqlConfig getConfig() {
         return AgtySqlConfig.getClone(config);
     }

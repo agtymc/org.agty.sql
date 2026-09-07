@@ -11,6 +11,13 @@ import java.util.*;
  * Строка с данными
  */
 public class RowData extends LinkedHashMap<String, Object> implements SqlRow {
+    /** Creates a new RowData instance. */
+    public RowData() {
+    }
+
+    /**
+     * Defines the data is string value.
+     */
     private boolean dataIsString = false;
 
     private Object getValue(String key) {

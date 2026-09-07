@@ -11,14 +11,26 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 
+/**
+ * Provides fetch operation behavior.
+ */
 public final class FetchOperation {
 
     private final AgtySqlOperationSupport support;
 
+    /**
+     * Creates a new instance.
+     * @param support parameter value
+     */
     public FetchOperation(AgtySqlOperationSupport support) {
         this.support = support;
     }
 
+    /**
+     * Performs the fetch operation.
+     * @param arguments parameter value
+     * @return operation result
+     */
     public SqlRow fetch(Arguments arguments) {
         String query = support.hasQuery(arguments)
                 ? arguments.getQuery()
@@ -55,6 +67,13 @@ public final class FetchOperation {
         );
     }
 
+    /**
+     * Performs the fetch entity operation.
+     * @param <T> type parameter
+     * @param arguments parameter value
+     * @param object parameter value
+     * @return operation result
+     */
     public <T> T fetchEntity(Arguments arguments, T object) {
         try {
             return ModelControl.newModelControl().fetchEntity(support.getAgtySQL(), arguments, object);
@@ -64,6 +83,13 @@ public final class FetchOperation {
         return null;
     }
 
+    /**
+     * Performs the fetch entity operation.
+     * @param <T> type parameter
+     * @param arguments parameter value
+     * @param clazz parameter value
+     * @return operation result
+     */
     public <T> T fetchEntity(Arguments arguments, Class<?> clazz) {
         try {
             return ModelControl.newModelControl().fetchEntity(support.getAgtySQL(), arguments, clazz);
@@ -73,6 +99,11 @@ public final class FetchOperation {
         return null;
     }
 
+    /**
+     * Performs the count rows operation.
+     * @param arguments parameter value
+     * @return operation result
+     */
     public Long countRows(Arguments arguments) {
         String query = support.hasQuery(arguments)
                 ? arguments.getQuery()
@@ -87,20 +118,40 @@ public final class FetchOperation {
         return 0L;
     }
 
+    /**
+     * Performs the table is exists operation.
+     * @param arguments parameter value
+     * @return operation result
+     */
     public boolean tableIsExists(Arguments arguments) {
         return support.getDriverSqlObject().tableIsExists(support.rebuildTable(arguments.getTable()));
     }
 
+    /**
+     * Performs the row is exists operation.
+     * @param arguments parameter value
+     * @return operation result
+     */
     public Boolean rowIsExists(Arguments arguments) {
         return support.getDriverSqlObject().rowIsExists(arguments);
     }
 
+    /**
+     * Returns the last row.
+     * @param arguments parameter value
+     * @return operation result
+     */
     public SqlRow getLastRow(Arguments arguments) {
         String query = support.getDriverSqlObject().getLastRowQuery(arguments);
         support.debugMessage("AgtySQL.getLastRow()", "Query: " + query);
         return fetchQuery(query, arguments, "AgtySQL.getLastRow()");
     }
 
+    /**
+     * Returns the first row.
+     * @param arguments parameter value
+     * @return operation result
+     */
     public SqlRow getFirstRow(Arguments arguments) {
         String query = support.getDriverSqlObject().getFirstRowQuery(arguments);
         support.debugMessage("AgtySQL.getFirstRow()", "Query: " + query);

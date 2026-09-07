@@ -11,6 +11,10 @@ import org.agty.sql.sqlbuilder.QueryDeleteBuilder;
 public class QueryDelete extends SqlQuery<QueryDelete> implements SqlQueries {
     private String query;
 
+    /**
+     * Creates a new instance.
+     * @param arguments parameter value
+     */
     public QueryDelete(Arguments arguments) {
         setArguments(arguments);
     }

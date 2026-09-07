@@ -2,6 +2,7 @@ package org.agty.sql.interfaces;
 
 import org.agty.sql.data.Arguments;
 import org.agty.sql.driver.DialectCapabilities;
+import org.agty.sql.driver.DialectFeatureSet;
 
 import java.sql.ResultSet;
 import java.util.ArrayList;
@@ -62,6 +63,15 @@ public interface Sql {
      */
     default DialectCapabilities getCapabilities() {
         return DialectCapabilities.none();
+    }
+
+    /**
+     * Extended database and JDBC feature matrix for the current dialect.
+     *
+     * @return immutable feature set
+     */
+    default DialectFeatureSet getFeatureSet() {
+        return DialectFeatureSet.none();
     }
 
     /**
@@ -146,6 +156,7 @@ public interface Sql {
      * Обнулить все последовательности.
      *
      * @param table имя таблицы.
+     * @return operation result
      */
     boolean restartIdentity(String table);
 
@@ -259,6 +270,7 @@ public interface Sql {
      * Insert a row and get a result
      * @param arguments Arguments
      * @return ResultSet
+     * @param fields parameter value
      */
     ResultSet insertAndGet(Arguments arguments, String fields);
 
@@ -266,6 +278,7 @@ public interface Sql {
      * Update a row and get a result
      * @param arguments Arguments
      * @return ResultSet
+     * @param fields parameter value
      */
     ResultSet updateAndGet(Arguments arguments, String fields);
 

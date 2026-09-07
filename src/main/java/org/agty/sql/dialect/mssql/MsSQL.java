@@ -4,6 +4,9 @@ import org.agty.sql.AgtySQL;
 import org.agty.sql.data.Arguments;
 import org.agty.sql.data.SqlExpression;
 import org.agty.sql.driver.DialectCapabilities;
+import org.agty.sql.driver.DialectFeature;
+import org.agty.sql.driver.DialectFeatureSet;
+import org.agty.sql.driver.DialectFeatureSupport;
 import org.agty.sql.driver.LastInsertIdStrategy;
 import org.agty.sql.driver.UpdateAndGetStrategy;
 import org.agty.sql.driver.WriteReturnStrategy;
@@ -17,12 +20,19 @@ import java.sql.SQLException;
 import java.util.List;
 import java.util.Locale;
 
+/**
+ * Provides ms sql behavior.
+ */
 public class MsSQL extends MySQL {
 
     private static final String DRIVER = "sqlserver";
     private static final String DEFAULT_DATABASE = "master";
     private static final String QUOTE_IDENTIFIER = "\"";
 
+    /**
+     * Creates a new instance.
+     * @param agtySQL parameter value
+     */
     public MsSQL(AgtySQL agtySQL) {
         super(agtySQL);
     }
@@ -61,6 +71,18 @@ public class MsSQL extends MySQL {
                 WriteReturnStrategy.NATIVE_RETURNING,
                 UpdateAndGetStrategy.NATIVE_RETURNING
         );
+    }
+
+    @Override
+    public DialectFeatureSet getFeatureSet() {
+        return DialectFeatureSet.builder()
+                .support(DialectFeature.DELETE_RETURNING, DialectFeatureSupport.ALTERNATIVE_SYNTAX)
+                .support(DialectFeature.UPSERT, DialectFeatureSupport.ALTERNATIVE_SYNTAX)
+                .support(DialectFeature.SELECT_FOR_UPDATE, DialectFeatureSupport.ALTERNATIVE_SYNTAX)
+                .support(DialectFeature.JDBC_BATCH, DialectFeatureSupport.JDBC_DRIVER)
+                .support(DialectFeature.JDBC_GENERATED_KEYS, DialectFeatureSupport.JDBC_DRIVER)
+                .support(DialectFeature.POSITIONAL_PARAMETERS, DialectFeatureSupport.JDBC_DRIVER)
+                .build();
     }
 
     @Override

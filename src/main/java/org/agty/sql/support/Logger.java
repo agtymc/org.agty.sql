@@ -26,10 +26,19 @@ public final class Logger {
     private final Path file;
     private final long maxFileSize;
 
+    /**
+     * Creates a new instance.
+     * @param fileName parameter value
+     */
     public Logger(String fileName) {
         this(fileName, DEFAULT_MAX_FILE_SIZE);
     }
 
+    /**
+     * Creates a new instance.
+     * @param fileName parameter value
+     * @param maxFileSize parameter value
+     */
     public Logger(String fileName, long maxFileSize) {
         if (fileName == null || fileName.isBlank()) {
             throw new IllegalArgumentException("Log filename must not be null or blank");
@@ -41,6 +50,11 @@ public final class Logger {
         this.maxFileSize = maxFileSize;
     }
 
+    /**
+     * Performs the write operation.
+     * @param string parameter value
+     * @throws IOException if the operation cannot be completed
+     */
     public void write(String string) throws IOException {
         synchronized (FILE_LOCK) {
             prepareFile();
@@ -56,6 +70,12 @@ public final class Logger {
         }
     }
 
+    /**
+     * Adds the append.
+     * @param string parameter value
+     * @param nl parameter value
+     * @throws IOException if the operation cannot be completed
+     */
     public void append(String string, String nl) throws IOException {
         byte[] data = (string + nl).getBytes(StandardCharsets.UTF_8);
         synchronized (FILE_LOCK) {
@@ -66,6 +86,11 @@ public final class Logger {
         }
     }
 
+    /**
+     * Adds the append.
+     * @param string parameter value
+     * @throws IOException if the operation cannot be completed
+     */
     public void append(String string) throws IOException {
         append(string, "\n");
     }
@@ -92,10 +117,18 @@ public final class Logger {
         }
     }
 
+    /**
+     * Performs the clear operation.
+     * @throws IOException if the operation cannot be completed
+     */
     public void clear() throws IOException {
         write("");
     }
 
+    /**
+     * Performs the remove operation.
+     * @throws LoggerException if the operation cannot be completed
+     */
     public void remove() throws LoggerException {
         try {
             if (!Files.isDirectory(file)) {

@@ -5,6 +5,9 @@ import org.agty.sql.data.Arguments;
 import org.agty.sql.data.InsertData;
 import org.agty.sql.data.SqlExpression;
 import org.agty.sql.driver.DialectCapabilities;
+import org.agty.sql.driver.DialectFeature;
+import org.agty.sql.driver.DialectFeatureSet;
+import org.agty.sql.driver.DialectFeatureSupport;
 import org.agty.sql.driver.LastInsertIdStrategy;
 import org.agty.sql.driver.UpdateAndGetStrategy;
 import org.agty.sql.driver.WriteReturnStrategy;
@@ -113,6 +116,17 @@ public class MySQL implements Sql {
         );
     }
 
+    @Override
+    public DialectFeatureSet getFeatureSet() {
+        return DialectFeatureSet.builder()
+                .support(DialectFeature.UPSERT, DialectFeatureSupport.ALTERNATIVE_SYNTAX)
+                .support(DialectFeature.SELECT_FOR_UPDATE, DialectFeatureSupport.SUPPORTED)
+                .support(DialectFeature.JDBC_BATCH, DialectFeatureSupport.JDBC_DRIVER)
+                .support(DialectFeature.JDBC_GENERATED_KEYS, DialectFeatureSupport.JDBC_DRIVER)
+                .support(DialectFeature.POSITIONAL_PARAMETERS, DialectFeatureSupport.JDBC_DRIVER)
+                .build();
+    }
+
     /**
      * A select query.
      *
@@ -210,7 +224,7 @@ public class MySQL implements Sql {
      * Update a row and get a result
      *
      * @param arguments Arguments
-     * @param fields
+     * @param fields comma-separated fields to return
      * @return SqlRow
      */
     @Override

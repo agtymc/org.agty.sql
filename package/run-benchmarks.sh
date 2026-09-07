@@ -4,7 +4,7 @@ set -euo pipefail
 MODE="${1:-smoke}"
 shift || true
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-VERSION="2.1.0"
+VERSION="2.2.0"
 JAR="${ROOT_DIR}/benchmarks/target/org-agty-sql-benchmarks-${VERSION}.jar"
 
 case "${MODE}" in
@@ -69,3 +69,5 @@ awk '
   echo "JMH timeout benchmark must report positive successfulBorrows and timeouts" >&2
   exit 1
 }
+
+"${ROOT_DIR}/package/check-benchmark-budget.sh" "${RESULT_FILE}"

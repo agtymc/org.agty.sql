@@ -21,6 +21,12 @@ public final class DialectDriverRegistry {
     private DialectDriverRegistry() {
     }
 
+    /**
+     * Returns the dialect.
+     * @param driver parameter value
+     * @param agtySQL parameter value
+     * @return operation result
+     */
     public static Sql getDialect(String driver, AgtySQL agtySQL) {
         switch (driver.toLowerCase(Locale.ROOT)) {
             case "mysql" -> {
@@ -49,6 +55,11 @@ public final class DialectDriverRegistry {
         throw new SqlDriverNotFoundException(driver);
     }
 
+    /**
+     * Returns the driver name.
+     * @param driver parameter value
+     * @return operation result
+     */
     public static String getDriverName(String driver) {
         return getDialect(driver, null).getDriverName();
     }

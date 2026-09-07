@@ -4,17 +4,33 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 
+/**
+ * Provides list result set behavior.
+ */
 public class ListResultSet implements AutoCloseable {
     private final ResultSet resultSet;
 
+    /**
+     * Creates a new instance.
+     * @param resultSet parameter value
+     */
     public ListResultSet(ResultSet resultSet) {
         this.resultSet = resultSet;
     }
 
+    /**
+     * Returns the result set.
+     * @return operation result
+     */
     public ResultSet getResultSet() {
         return resultSet;
     }
 
+    /**
+     * Returns the statement.
+     * @return operation result
+     * @throws SQLException if the operation cannot be completed
+     */
     public Statement getStatement() throws SQLException {
         return resultSet == null ? null : resultSet.getStatement();
     }

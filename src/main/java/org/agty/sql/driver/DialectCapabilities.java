@@ -17,6 +17,15 @@ public record DialectCapabilities(
         UpdateAndGetStrategy updateAndGetStrategy
 ) {
 
+    /**
+     * Performs the of operation.
+     * @param fileBased parameter value
+     * @param supportsSchema parameter value
+     * @param lastInsertIdStrategy parameter value
+     * @param insertAndGetStrategy parameter value
+     * @param updateAndGetStrategy parameter value
+     * @return operation result
+     */
     public static DialectCapabilities of(
             boolean fileBased,
             boolean supportsSchema,
@@ -33,6 +42,10 @@ public record DialectCapabilities(
         );
     }
 
+    /**
+     * Performs the none operation.
+     * @return operation result
+     */
     public static DialectCapabilities none() {
         return of(
                 false,
@@ -43,46 +56,90 @@ public record DialectCapabilities(
         );
     }
 
+    /**
+     * Returns whether insert and get.
+     * @return operation result
+     */
     public boolean supportsInsertAndGet() {
         return insertAndGetStrategy != WriteReturnStrategy.NONE;
     }
 
+    /**
+     * Returns whether insert and get returning.
+     * @return operation result
+     */
     public boolean supportsInsertAndGetReturning() {
         return insertAndGetStrategy == WriteReturnStrategy.NATIVE_RETURNING;
     }
 
+    /**
+     * Performs the uses follow up fetch for insert and get operation.
+     * @return operation result
+     */
     public boolean usesFollowUpFetchForInsertAndGet() {
         return insertAndGetStrategy == WriteReturnStrategy.FOLLOW_UP_FETCH;
     }
 
+    /**
+     * Returns whether update and get.
+     * @return operation result
+     */
     public boolean supportsUpdateAndGet() {
         return updateAndGetStrategy != UpdateAndGetStrategy.NONE;
     }
 
+    /**
+     * Returns whether update and get returning.
+     * @return operation result
+     */
     public boolean supportsUpdateAndGetReturning() {
         return updateAndGetStrategy == UpdateAndGetStrategy.NATIVE_RETURNING;
     }
 
+    /**
+     * Performs the uses follow up fetch for update and get operation.
+     * @return operation result
+     */
     public boolean usesFollowUpFetchForUpdateAndGet() {
         return updateAndGetStrategy.usesFollowUpFetch();
     }
 
+    /**
+     * Performs the uses primary key follow up for update and get operation.
+     * @return operation result
+     */
     public boolean usesPrimaryKeyFollowUpForUpdateAndGet() {
         return updateAndGetStrategy == UpdateAndGetStrategy.FOLLOW_UP_FETCH_BY_PRIMARY_KEY;
     }
 
+    /**
+     * Performs the uses where follow up for update and get operation.
+     * @return operation result
+     */
     public boolean usesWhereFollowUpForUpdateAndGet() {
         return updateAndGetStrategy == UpdateAndGetStrategy.FOLLOW_UP_FETCH_BY_WHERE;
     }
 
+    /**
+     * Performs the uses unsafe follow up for update and get operation.
+     * @return operation result
+     */
     public boolean usesUnsafeFollowUpForUpdateAndGet() {
         return updateAndGetStrategy == UpdateAndGetStrategy.FOLLOW_UP_FETCH_UNSAFE;
     }
 
+    /**
+     * Returns whether last insert id.
+     * @return operation result
+     */
     public boolean supportsLastInsertId() {
         return lastInsertIdStrategy != LastInsertIdStrategy.NONE;
     }
 
+    /**
+     * Performs the uses unsafe last insert id fallback operation.
+     * @return operation result
+     */
     public boolean usesUnsafeLastInsertIdFallback() {
         return lastInsertIdStrategy == LastInsertIdStrategy.FETCH_LAST_ROW_UNSAFE;
     }

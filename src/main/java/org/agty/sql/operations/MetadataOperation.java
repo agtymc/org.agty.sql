@@ -4,14 +4,26 @@ import org.agty.sql.AgtySqlOperationSupport;
 import org.agty.sql.data.Arguments;
 import org.agty.sql.interfaces.SqlRow;
 
+/**
+ * Provides metadata operation behavior.
+ */
 public final class MetadataOperation {
 
     private final AgtySqlOperationSupport support;
 
+    /**
+     * Creates a new instance.
+     * @param support parameter value
+     */
     public MetadataOperation(AgtySqlOperationSupport support) {
         this.support = support;
     }
 
+    /**
+     * Performs the truncate operation.
+     * @param arguments parameter value
+     * @return operation result
+     */
     public boolean truncate(Arguments arguments) {
         String query = support.getDriverSqlObject()
                 .truncateQuery(support.rebuildTable(arguments.getTable()));
@@ -19,12 +31,22 @@ public final class MetadataOperation {
         return support.execute(query, arguments.noRebuildQuery());
     }
 
+    /**
+     * Performs the drop column operation.
+     * @param arguments parameter value
+     * @return operation result
+     */
     public boolean dropColumn(Arguments arguments) {
         String query = support.getDriverSqlObject().dropColumnQuery(arguments);
         support.debugMessage("AgtySQL.dropColumn()", "Query: " + query);
         return support.execute(query, arguments.noRebuildQuery());
     }
 
+    /**
+     * Performs the drop table operation.
+     * @param arguments parameter value
+     * @return operation result
+     */
     public boolean dropTable(Arguments arguments) {
         String query = support.getDriverSqlObject()
                 .dropTableQuery(support.rebuildTable(arguments.getTable()));
@@ -32,26 +54,53 @@ public final class MetadataOperation {
         return support.execute(query, arguments.noRebuildQuery());
     }
 
+    /**
+     * Performs the max operation.
+     * @param arguments parameter value
+     * @return operation result
+     */
     public Long max(Arguments arguments) {
         return support.getDriverSqlObject().max(arguments);
     }
 
+    /**
+     * Performs the max or default operation.
+     * @param arguments parameter value
+     * @param defaultValue parameter value
+     * @return operation result
+     */
     public Long maxOrDefault(Arguments arguments, long defaultValue) {
         Long max = max(arguments);
         if (max != null) return max;
         return defaultValue;
     }
 
+    /**
+     * Performs the min operation.
+     * @param arguments parameter value
+     * @return operation result
+     */
     public Long min(Arguments arguments) {
         return support.getDriverSqlObject().min(arguments);
     }
 
+    /**
+     * Performs the min or default operation.
+     * @param arguments parameter value
+     * @param defaultValue parameter value
+     * @return operation result
+     */
     public Long minOrDefault(Arguments arguments, long defaultValue) {
         Long min = min(arguments);
         if (min != null) return min;
         return defaultValue;
     }
 
+    /**
+     * Performs the last insert id operation.
+     * @param arguments parameter value
+     * @return operation result
+     */
     public Long lastInsertId(Arguments arguments) {
         return switch (support.getDialectCapabilities().lastInsertIdStrategy()) {
             case NONE -> null;

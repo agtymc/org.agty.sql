@@ -16,6 +16,13 @@ public final class ManagedResultSet {
     private ManagedResultSet() {
     }
 
+    /**
+     * Performs the wrap operation.
+     * @param resultSet parameter value
+     * @param statement parameter value
+     * @param closeCallback parameter value
+     * @return operation result
+     */
     public static ResultSet wrap(
             ResultSet resultSet,
             Statement statement,

@@ -9,6 +9,10 @@ import java.util.List;
  * Массив сопоставлений типов полей AgtySQL и полей драйвера (MySQL, PgSQL, etc)
  */
 public class FieldsType implements FieldsTypes {
+    /** Creates a new FieldsType instance. */
+    public FieldsType() {
+    }
+
     /**
      * Массив сопоставлений
      */

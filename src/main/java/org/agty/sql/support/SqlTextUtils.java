@@ -12,6 +12,11 @@ public final class SqlTextUtils {
     private SqlTextUtils() {
     }
 
+    /**
+     * Performs the hencode operation.
+     * @param source parameter value
+     * @return operation result
+     */
     public static String hencode(String source) {
         if (source == null || source.isEmpty()) {
             return "";
@@ -45,6 +50,11 @@ public final class SqlTextUtils {
         return sb.toString();
     }
 
+    /**
+     * Performs the hdecode operation.
+     * @param body parameter value
+     * @return operation result
+     */
     public static String hdecode(String body) {
         if (body == null || body.isEmpty()) {
             return "";
@@ -72,6 +82,11 @@ public final class SqlTextUtils {
         return result.toString().replace("&amp;", "&");
     }
 
+    /**
+     * Performs the remove unsupported chars operation.
+     * @param query parameter value
+     * @return operation result
+     */
     public static String removeUnsupportedChars(String query) {
         return query.replaceAll("\0", "");
     }

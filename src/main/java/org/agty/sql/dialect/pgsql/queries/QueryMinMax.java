@@ -13,15 +13,27 @@ public class QueryMinMax extends SqlQuery<QueryMinMax> implements SqlQueries {
 
     private boolean getMax = false;
 
+    /**
+     * Creates a new instance.
+     * @param arguments parameter value
+     */
     public QueryMinMax(Arguments arguments) {
         setArguments(arguments);
     }
 
+    /**
+     * Returns the max.
+     * @return operation result
+     */
     public QueryMinMax getMax() {
         this.getMax = true;
         return this;
     }
 
+    /**
+     * Returns the min.
+     * @return operation result
+     */
     public QueryMinMax getMin() {
         this.getMax = false;
         return this;
