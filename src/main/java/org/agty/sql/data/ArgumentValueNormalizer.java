@@ -7,7 +7,7 @@ import java.math.BigInteger;
  * Validates dynamically supplied argument values without implicit string conversion.
  */
 final class ArgumentValueNormalizer {
-    private static final String SUPPORTED_DATA_TYPES = "String, Number, Boolean, Character";
+    private static final String SUPPORTED_DATA_TYPES = "String, Number, Boolean, Character, LocalDateTime, LocalDate, LocalTime, java.util.Date";
 
     private ArgumentValueNormalizer() {
     }

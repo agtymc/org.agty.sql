@@ -953,6 +953,11 @@ public class Arguments {
             return addDataChar(field, value);
         }
 
+        if (value instanceof java.time.LocalDateTime || value instanceof java.time.LocalDate
+                || value instanceof java.time.LocalTime || value instanceof java.util.Date) {
+            dataPut(field, value);
+            return this;
+        }
         throw ArgumentValueNormalizer.unsupportedDataType(field, value);
     }
 

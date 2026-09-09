@@ -108,16 +108,6 @@ public class ModelArgumentsBuilder {
     }
 
     private void setDataToArguments(Arguments arguments, ColumnEntity column) {
-        if (column.valueIsDigit() && !column.columnIsString()) {
-            arguments.addData(
-                    column.getColumn(),
-                    column.getDigitValue()
-            );
-        } else {
-            arguments.addData(
-                    column.getColumn(),
-                    column.getStringValue()
-            );
-        }
+        arguments.addData(column.getColumn(), column.getValue());
     }
 }

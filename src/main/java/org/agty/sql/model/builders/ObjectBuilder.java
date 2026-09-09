@@ -85,9 +85,15 @@ public class ObjectBuilder {
                         fieldName = field.getName();
                     }
 
-                    if (sqlRow.isSet(fieldName)) {
+                    if (sqlRow instanceof java.util.Map<?, ?> rowMap
+                            && rowMap.keySet().stream().anyMatch(key -> fieldName.equalsIgnoreCase(key.toString()))
+                            && sqlRow.getObject(fieldName) == null && !field.getType().isPrimitive()) {
+                        field.set(newObjectInstance, null);
+                    } else if (sqlRow.isSet(fieldName)) {
 
-                        if (isFieldInstanceOfType(field, Integer.class)) {
+                        if (isFieldInstanceOfType(field, java.math.BigDecimal.class)) {
+                            field.set(newObjectInstance, new java.math.BigDecimal(sqlRow.getObject(fieldName).toString()));
+                        } else if (isFieldInstanceOfType(field, Integer.class)) {
                             field.set(newObjectInstance, sqlRow.getInt(fieldName));
                         }
 
@@ -107,7 +113,7 @@ public class ObjectBuilder {
                             field.set(newObjectInstance, sqlRow.getString(fieldName));
                         }
 
-                        else if (isFieldInstanceOfType(field, Boolean.class)) {
+                        else if (isFieldInstanceOfType(field, Boolean.class) || field.getType() == boolean.class) {
                             field.set(newObjectInstance, sqlRow.getBoolean(fieldName));
                         }
 
@@ -131,6 +137,18 @@ public class ObjectBuilder {
                             field.set(newObjectInstance, sqlRow.getLocalTime(fieldName));
                         }
 
+                        else if (isFieldInstanceOfType(field, java.sql.Timestamp.class)) {
+                            field.set(newObjectInstance, java.sql.Timestamp.valueOf(sqlRow.getLocalDateTime(fieldName)));
+                        }
+                        else if (isFieldInstanceOfType(field, java.sql.Date.class)) {
+                            field.set(newObjectInstance, java.sql.Date.valueOf(sqlRow.getLocalDate(fieldName)));
+                        }
+                        else if (isFieldInstanceOfType(field, java.sql.Time.class)) {
+                            field.set(newObjectInstance, java.sql.Time.valueOf(sqlRow.getLocalTime(fieldName)));
+                        }
+                        else if (isFieldInstanceOfType(field, java.math.BigInteger.class)) {
+                            field.set(newObjectInstance, new java.math.BigDecimal(sqlRow.getObject(fieldName).toString()).toBigIntegerExact());
+                        }
                         else if (isFieldInstanceOfType(field, Date.class)) {
                             field.set(newObjectInstance, sqlRow.getDate(fieldName));
                         }

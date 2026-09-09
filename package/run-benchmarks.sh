@@ -4,7 +4,7 @@ set -euo pipefail
 MODE="${1:-smoke}"
 shift || true
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-VERSION="2.2.0"
+VERSION="2.2.1"
 JAR="${ROOT_DIR}/benchmarks/target/org-agty-sql-benchmarks-${VERSION}.jar"
 
 case "${MODE}" in

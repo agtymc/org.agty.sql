@@ -17,7 +17,7 @@ public class ModelUtils {
      */
     public static boolean columnIsSimple(Class<?> type) {
         switch (type.getSimpleName()) {
-            case "String", "Integer", "boolean",
+            case "String", "Integer", "boolean", "Boolean", "BigDecimal", "BigInteger", "Timestamp", "Time",
                  "Character", "Double",
                  "Float", "Long",
                  "Date", "LocalTime",

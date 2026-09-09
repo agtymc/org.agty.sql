@@ -2,8 +2,26 @@
 
 ## Unreleased
 
+## 2.2.1 - 2026-09-09
+
+### Fixed
+- Entity INSERT and UPDATE preserve parameter types through `saveEntityWithCheck()` and result mapping, including `LocalDateTime`, `Boolean`, `BigDecimal`, and SQL NULL.
+- Local timestamps retain microseconds without MySQL time-zone shifts; SQL NULL clears reference-field initializers when reading saved entities.
+- SQLite temporal parameters use consistent sortable text for writes and comparisons.
+
 ### Changed
-- The release workflow now uses the current `actions/setup-java` Maven credential environment-variable inputs, removing deprecated-input warnings without changing credential handling.
+- The release workflow uses the current `actions/setup-java` Maven credential environment-variable inputs, removing deprecated-input warnings without changing credential handling.
+
+### Migration
+- For timestamp fields, Drive must use `LocalDateTime` and parse incoming date strings explicitly. Strings continue to bind as strings; the library does not infer dates.
+- Existing SQLite dates in other representations must be normalized before comparing them with the new temporal parameters.
+- SQL Server pools require an explicit `trustServerCertificate=true` override when needed; the secure default remains `false`.
+- See [Drive migration instructions](docs/MIGRATION_2_2_1.md).
+
+### Testing
+- 266 tests passed without failures, errors, or skips, including entity round trips on PostgreSQL, MySQL, MariaDB, SQLite, SQL Server, and H2.
+- SpotBugs, PMD, coverage gates, japicmp against 2.0.4, and the 2.x binary upgrade test passed.
+- JMH smoke passed all benchmark presence, pool saturation, and relative performance budget checks.
 
 ## 2.2.0 - 2026-09-07
 

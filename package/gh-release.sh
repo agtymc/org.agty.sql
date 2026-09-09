@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-RELEASE_VERSION="2.2.0"
+# Publication workflow extracts this version's release notes from CHANGELOG.md.
+RELEASE_VERSION="2.2.1"
 VERSION="${1:-${RELEASE_VERSION}}"
 TAG="v${VERSION}"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

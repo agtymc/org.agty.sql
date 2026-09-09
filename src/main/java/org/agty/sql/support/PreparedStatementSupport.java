@@ -18,6 +18,10 @@ import java.util.List;
  * Internal helpers for the opt-in high-level PreparedStatement mode.
  */
 public final class PreparedStatementSupport {
+    private static final java.time.format.DateTimeFormatter SQLITE_DATE_TIME =
+            java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSSSSSSSS");
+    private static final java.time.format.DateTimeFormatter SQLITE_TIME =
+            java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss.SSSSSSSSS");
 
     private PreparedStatementSupport() {
     }
@@ -33,7 +37,26 @@ public final class PreparedStatementSupport {
             Object value = parameters.get(i);
             int parameterIndex = i + 1;
 
-            if (value instanceof BigDecimal decimal) {
+            if (value instanceof java.time.LocalDateTime dateTime) {
+                if (isSqlite(statement)) {
+                    bindTemporalSqlite(statement, parameterIndex, dateTime);
+                } else {
+                    statement.setObject(parameterIndex, dateTime);
+                }
+            } else if (value instanceof java.time.LocalDate date) {
+                if (isSqlite(statement)) statement.setString(parameterIndex, date.toString());
+                else statement.setDate(parameterIndex, java.sql.Date.valueOf(date));
+            } else if (value instanceof java.time.LocalTime time) {
+                if (isSqlite(statement)) bindTemporalSqlite(statement, parameterIndex, time);
+                else statement.setTime(parameterIndex, java.sql.Time.valueOf(time));
+            } else if (value instanceof java.util.Date date && isSqlite(statement)) {
+                Object temporal = date instanceof java.sql.Date sqlDate ? sqlDate.toLocalDate()
+                        : date instanceof java.sql.Time sqlTime ? sqlTime.toLocalTime()
+                        : date instanceof Timestamp timestamp ? timestamp.toLocalDateTime()
+                        : new Timestamp(date.getTime()).toLocalDateTime();
+                // Reuse the same representation for write and WHERE parameters.
+                bindTemporalSqlite(statement, parameterIndex, temporal);
+            } else if (value instanceof BigDecimal decimal) {
                 statement.setBigDecimal(parameterIndex, decimal);
             } else if (value instanceof BigInteger integer) {
                 statement.setBigDecimal(parameterIndex, new BigDecimal(integer));
@@ -54,6 +77,18 @@ public final class PreparedStatementSupport {
                 statement.setObject(parameterIndex, value);
             }
         }
+    }
+
+    private static boolean isSqlite(PreparedStatement statement) throws SQLException {
+        return "SQLite".equalsIgnoreCase(statement.getConnection().getMetaData().getDatabaseProductName());
+    }
+
+    private static void bindTemporalSqlite(PreparedStatement statement, int index, Object value) throws SQLException {
+        String text = value instanceof java.time.LocalDateTime dateTime
+                ? dateTime.format(SQLITE_DATE_TIME)
+                : value instanceof java.time.LocalTime time
+                ? time.format(SQLITE_TIME) : value.toString();
+        statement.setString(index, text);
     }
 
     /**

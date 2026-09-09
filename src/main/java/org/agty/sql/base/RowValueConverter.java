@@ -21,6 +21,7 @@ import java.util.Locale;
 final class RowValueConverter {
     private static final List<DateTimeFormatter> LOCAL_DATE_TIME_FORMATTERS = List.of(
             DateTimeFormatter.ISO_LOCAL_DATE_TIME,
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSSSSSSSS"),
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS"),
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"),
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"),
@@ -134,6 +135,10 @@ final class RowValueConverter {
     }
 
     static LocalTime asLocalTime(Object value) {
+        if (value instanceof CharSequence text) {
+            try { return LocalTime.parse(text); }
+            catch (DateTimeParseException ignored) { }
+        }
         if (value instanceof LocalTime localTime) return localTime;
         if (value instanceof LocalDateTime dateTime) return dateTime.toLocalTime();
         if (value instanceof java.sql.Time time) return time.toLocalTime();
@@ -158,6 +163,12 @@ final class RowValueConverter {
         if (value instanceof OffsetDateTime offsetDateTime) return offsetDateTime.toLocalDateTime();
         if (value instanceof ZonedDateTime zonedDateTime) return zonedDateTime.toLocalDateTime();
         if (value instanceof CharSequence) {
+            for (DateTimeFormatter formatter : LOCAL_DATE_TIME_FORMATTERS) {
+                try {
+                    return LocalDateTime.parse(value.toString().trim(), formatter);
+                } catch (DateTimeParseException ignored) {
+                }
+            }
             Date parsed = asDate(value);
             return parsed == null
                     ? null
