@@ -21,6 +21,7 @@ Contents:
 - [13. Recommended Usage Patterns](./userguide/13-recommended-usage-patterns.md)
 - [14. Migration Notes](./userguide/14-migration-notes.md)
 - [15. Verification Basis](./userguide/15-verification-basis.md)
+- [16. ClickHouse](./userguide/16-clickhouse.md)
 
 For the separate low-level session/JDBC contract, see
 `docs/en/AGTYSQL_SESSION_API.md`.

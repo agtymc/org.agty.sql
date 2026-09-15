@@ -65,7 +65,7 @@ import java.util.List;
  */
 public class AgtySQL implements AutoCloseable {
     /** Version */
-    final public static String VERSION = "2.2.1";
+    final public static String VERSION = "2.3.0";
 
     /** Connection and statement*/
     private final AgtySqlConnector connector;

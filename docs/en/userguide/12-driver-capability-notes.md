@@ -14,6 +14,7 @@ matrix is:
 | MariaDB | no | server | connection-scoped function | follow-up / transaction-guarded | follow-up by WHERE / collision-prone |
 | SQLite | no | file | connection-scoped function | follow-up / transaction-guarded | follow-up by WHERE / collision-prone |
 | H2 | yes | file | last-row fallback / collision-prone | follow-up / collision-prone | follow-up by WHERE / collision-prone |
+| ClickHouse | no | server | unsupported | unsupported | unsupported |
 
 Extended engine/JDBC building blocks are exposed separately through
 `AgtySQL.getDialectFeatureSet()`. They describe what can be built with direct
@@ -27,6 +28,7 @@ or low-level SQL; they do not imply a dedicated high-level library method.
 | MariaDB | supported (`RETURNING`, single-table delete) | alternative syntax (`ON DUPLICATE KEY`) | supported | JDBC driver | unsupported |
 | SQLite | supported (`RETURNING`) | supported (`ON CONFLICT`) | unsupported | JDBC driver | unsupported |
 | H2 | unsupported | alternative syntax (`MERGE`) | supported | JDBC driver | unsupported |
+| ClickHouse | unsupported | unsupported | unsupported | batch / `?` via JDBC, generated keys unsupported | unsupported |
 
 Practical meaning:
 
@@ -40,6 +42,9 @@ Practical meaning:
 - some strategies are emulated;
 - for H2, the insert-return scenario must currently be treated as
   collision-prone under concurrent inserts;
+- for ClickHouse, write-return scenarios are disabled because the dialect is
+  aimed at analytical insert/read workloads, not portable same-operation row
+  return semantics;
 - raw `String query` overloads for `insertAndGet()` / `updateAndGet()` should
   not be treated as equally portable on follow-up drivers: without metadata,
   the library cannot perform a correct post-write fetch.

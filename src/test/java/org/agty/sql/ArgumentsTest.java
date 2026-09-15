@@ -419,6 +419,7 @@ class ArgumentsTest {
         assertEquals(1, arguments.getBooleanValueForDriver(true, "mssql"));
         assertEquals(0, arguments.getBooleanValueForDriver(false, "sqlite"));
         assertEquals(1, arguments.getBooleanValueForDriver(true, "h2"));
+        assertEquals(1, arguments.getBooleanValueForDriver(true, "clickhouse"));
         assertEquals(true, arguments.getBooleanValueForDriver(true, "pgsql"));
         assertEquals(false, arguments.getBooleanValueForDriver(false, "postgresql"));
     }

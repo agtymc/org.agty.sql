@@ -13,6 +13,7 @@ transaction-guarded, collision-prone и unsupported поведение. Теку
 | MariaDB | нет | сервер | connection-scoped function | follow-up / transaction-guarded | follow-up by WHERE / collision-prone |
 | SQLite | нет | файл | connection-scoped function | follow-up / transaction-guarded | follow-up by WHERE / collision-prone |
 | H2 | да | файл | last-row fallback / collision-prone | follow-up / collision-prone | follow-up by WHERE / collision-prone |
+| ClickHouse | нет | сервер | unsupported | unsupported | unsupported |
 
 Расширенные возможности движка/JDBC доступны отдельно через
 `AgtySQL.getDialectFeatureSet()`. Они описывают строительные блоки для прямого
@@ -26,6 +27,7 @@ transaction-guarded, collision-prone и unsupported поведение. Теку
 | MariaDB | supported (`RETURNING`, single-table delete) | alternative syntax (`ON DUPLICATE KEY`) | supported | JDBC driver | unsupported |
 | SQLite | supported (`RETURNING`) | supported (`ON CONFLICT`) | unsupported | JDBC driver | unsupported |
 | H2 | unsupported | alternative syntax (`MERGE`) | supported | JDBC driver | unsupported |
+| ClickHouse | unsupported | unsupported | unsupported | batch / `?` via JDBC, generated keys unsupported | unsupported |
 
 Практический смысл:
 
@@ -39,6 +41,9 @@ transaction-guarded, collision-prone и unsupported поведение. Теку
 - часть стратегий являются emulated;
 - для H2 insert-return сценарий сейчас нужно считать collision-prone при
   конкурентных вставках.
+- для ClickHouse write-return сценарии отключены, потому что диалект
+  ориентирован на аналитические insert/read workloads, а не на переносимое
+  получение измененной строки в той же операции.
 - raw `String query` overloads для `insertAndGet()` / `updateAndGet()` не нужно
   считать одинаково переносимыми на follow-up драйверах: без metadata библиотека
   не может корректно выполнить post-write fetch.

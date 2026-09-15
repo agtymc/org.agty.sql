@@ -94,3 +94,15 @@ db.mssql.serverTimeZone = UTC
 db.mssql.trustServerCertificate = true
 db.mssql.logquery = false
 db.mssql.debug = false
+
+db.clickhouse.driver = clickhouse
+db.clickhouse.server = localhost
+db.clickhouse.port = 28123
+db.clickhouse.user = agty_sql
+db.clickhouse.password = agty_sql
+db.clickhouse.database = agty_sql
+db.clickhouse.pfx = agty_
+db.clickhouse.encoding = UTF-8
+db.clickhouse.serverTimeZone = UTC
+db.clickhouse.logquery = false
+db.clickhouse.debug = false

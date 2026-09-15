@@ -9,7 +9,7 @@ Source repository: `https://github.com/agtymc/org.agty.sql`
 
 ## Supported Drivers
 
-Current SQL driver support in `2.2.1`:
+Current SQL driver support in `2.3.0`:
 
 - MySQL
 - MariaDB
@@ -17,6 +17,7 @@ Current SQL driver support in `2.2.1`:
 - MSSQL (SQL Server)
 - SQLite
 - H2
+- ClickHouse
 
 Driver notes:
 
@@ -25,7 +26,10 @@ Driver notes:
 - PostgreSQL and MSSQL provide native row-return support for
   `insertAndGet()` / `updateAndGet()`.
 - SQLite and H2 are file-based development-friendly options.
+- ClickHouse is supported for analytical read/insert flows; write-return
+  methods `insertAndGet()` / `updateAndGet()` are disabled by capabilities.
 - MSSQL local development can be started with `install/install-mssql.sh`.
+- ClickHouse local development can be started with `install/install-clickhouse.sh`.
 
 ## Documentation
 
@@ -61,7 +65,7 @@ Then add the dependency:
     <dependency>
         <groupId>org.agty</groupId>
         <artifactId>org-agty-sql</artifactId>
-        <version>2.2.1</version>
+        <version>2.3.0</version>
     </dependency>
 </dependencies>
 ```
@@ -88,10 +92,10 @@ When the JAR is packaged, add it to your project in one of these ways:
 
 ```bash
 mvn install:install-file \
-  -Dfile=path/to/org-agty-sql-2.2.1.jar \
+  -Dfile=path/to/org-agty-sql-2.3.0.jar \
   -DgroupId=org.agty \
   -DartifactId=org-agty-sql \
-  -Dversion=2.2.1 \
+  -Dversion=2.3.0 \
   -Dpackaging=jar
 ```
 
@@ -101,7 +105,7 @@ Then use the regular Maven dependency:
 <dependency>
     <groupId>org.agty</groupId>
     <artifactId>org-agty-sql</artifactId>
-    <version>2.2.1</version>
+    <version>2.3.0</version>
 </dependency>
 ```
 

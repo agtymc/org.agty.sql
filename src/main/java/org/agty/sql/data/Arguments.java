@@ -1296,7 +1296,7 @@ public class Arguments {
         }
 
         return switch (driver.trim().toLowerCase(Locale.ROOT)) {
-            case "mysql", "mariadb", "mssql", "sqlserver", "sqlite", "h2" -> value ? 1 : 0;
+            case "mysql", "mariadb", "mssql", "sqlserver", "sqlite", "h2", "clickhouse" -> value ? 1 : 0;
             case "pgsql", "postgres", "postgresql" -> value;
             default -> throw new IllegalArgumentException(
                     "Unsupported driver for boolean value conversion: " + driver

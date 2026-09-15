@@ -54,6 +54,25 @@ class AgtySqlConnectionSecurityTest {
         assertTrue(sqlServerUri.contains("socketTimeout=34000;"));
     }
 
+    @Test
+    void clickHouseUsesDedicatedJdbcUrlProperties() {
+        AgtySqlConfig clickHouse = new AgtySqlConfig()
+                .setDriver("clickhouse")
+                .setServer("db.example.test")
+                .setPort(8123)
+                .setDatabase("events")
+                .setLoginTimeoutSeconds(12)
+                .setNetworkTimeoutMillis(34_000);
+
+        String uri = new AgtySqlConnection(clickHouse, "clickhouse").getConnectionURI();
+
+        assertTrue(uri.startsWith("jdbc:clickhouse://db.example.test:8123/events?"));
+        assertTrue(uri.contains("connection_timeout=12000"));
+        assertTrue(uri.contains("socket_timeout=34000"));
+        assertFalse(uri.contains("serverTimezone"));
+        assertFalse(uri.contains("characterEncoding"));
+    }
+
     private AgtySqlConfig sqlServerConfig() {
         return new AgtySqlConfig()
                 .setDriver("mssql")

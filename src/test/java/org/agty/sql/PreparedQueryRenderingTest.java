@@ -1,6 +1,7 @@
 package org.agty.sql;
 
 import org.agty.sql.data.Arguments;
+import org.agty.sql.dialect.clickhouse.ClickHouse;
 import org.agty.sql.dialect.mssql.MsSQL;
 import org.agty.sql.dialect.mysql.MySQL;
 import org.agty.sql.dialect.pgsql.PgSQL;
@@ -31,6 +32,21 @@ class PreparedQueryRenderingTest {
         assertEquals(
                 "UPDATE {users} SET `name`=?,`description`=? WHERE [id] = ?",
                 new MySQL(null).updateQuery(arguments)
+        );
+    }
+
+    @Test
+    void rendersClickHouseMutationsWithPlaceholders() {
+        Arguments arguments = preparedUpdateArguments();
+        ClickHouse clickHouse = new ClickHouse(null);
+
+        assertEquals(
+                "ALTER TABLE {users} UPDATE `name`=?,`description`=? WHERE [id] = ?",
+                clickHouse.updateQuery(arguments)
+        );
+        assertEquals(
+                "ALTER TABLE {users} DELETE WHERE [id] = ?",
+                clickHouse.deleteQuery(arguments)
         );
     }
 

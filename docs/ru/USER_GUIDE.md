@@ -21,6 +21,7 @@
 - [13. Рекомендуемые шаблоны использования](./userguide/13-recommended-usage-patterns.md)
 - [14. Заметки по миграции](./userguide/14-migration-notes.md)
 - [15. Основа для проверки](./userguide/15-verification-basis.md)
+- [16. ClickHouse](./userguide/16-clickhouse.md)
 
 Если нужен низкоуровневый session/JDBC контракт отдельно, см.
 `docs/ru/AGTYSQL_SESSION_API.md`.

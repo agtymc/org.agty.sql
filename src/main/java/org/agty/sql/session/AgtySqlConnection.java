@@ -93,6 +93,10 @@ public class AgtySqlConnection {
             return getSqlServerConnectionUri();
         }
 
+        if (isClickHouseDriver()) {
+            return getClickHouseConnectionUri();
+        }
+
         StringBuilder connectURI = new StringBuilder();
 
         connectURI.append("jdbc:");
@@ -139,6 +143,10 @@ public class AgtySqlConnection {
         return "sqlserver".equalsIgnoreCase(getDriver());
     }
 
+    private boolean isClickHouseDriver() {
+        return "clickhouse".equalsIgnoreCase(getDriver());
+    }
+
     private String getSqliteConnectionUri() {
         return "jdbc:sqlite:" + normalizeDatabasePath();
     }
@@ -180,6 +188,45 @@ public class AgtySqlConnection {
             connectURI.append("socketTimeout=");
             connectURI.append(getConfig().getNetworkTimeoutMillis());
             connectURI.append(';');
+        }
+
+        return connectURI.toString();
+    }
+
+    private String getClickHouseConnectionUri() {
+        StringBuilder connectURI = new StringBuilder();
+
+        connectURI.append("jdbc:clickhouse://");
+        connectURI.append(getConfig().getServer());
+
+        if (getConfig().getPort() > 0) {
+            connectURI.append(':');
+            connectURI.append(getConfig().getPort());
+        }
+
+        connectURI.append('/');
+
+        if (getConfig().isDatabase()) {
+            connectURI.append(getConfig().getDatabase());
+        }
+
+        if (getConfig().getLoginTimeoutSeconds() > 0 || getConfig().getNetworkTimeoutMillis() > 0) {
+            connectURI.append('?');
+            boolean hasParameter = false;
+
+            if (getConfig().getLoginTimeoutSeconds() > 0) {
+                connectURI.append("connection_timeout=");
+                connectURI.append(getConfig().getLoginTimeoutSeconds() * 1000L);
+                hasParameter = true;
+            }
+
+            if (getConfig().getNetworkTimeoutMillis() > 0) {
+                if (hasParameter) {
+                    connectURI.append('&');
+                }
+                connectURI.append("socket_timeout=");
+                connectURI.append(getConfig().getNetworkTimeoutMillis());
+            }
         }
 
         return connectURI.toString();

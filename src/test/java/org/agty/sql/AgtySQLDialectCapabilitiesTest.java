@@ -69,9 +69,14 @@ class AgtySQLDialectCapabilitiesTest {
                 "org.agty.sql.dialect.mssql.MsSQL",
                 DialectDriverRegistry.getDialect("mssql", null).getClass().getName()
         );
+        Assertions.assertEquals(
+                "org.agty.sql.dialect.clickhouse.ClickHouse",
+                DialectDriverRegistry.getDialect("clickhouse", null).getClass().getName()
+        );
         Assertions.assertEquals("mysql", DialectDriverRegistry.getDriverName("mysql"));
         Assertions.assertEquals("postgresql", DialectDriverRegistry.getDriverName("pgsql"));
         Assertions.assertEquals("sqlserver", DialectDriverRegistry.getDriverName("mssql"));
+        Assertions.assertEquals("clickhouse", DialectDriverRegistry.getDriverName("clickhouse"));
     }
 
     @Test
@@ -91,6 +96,28 @@ class AgtySQLDialectCapabilitiesTest {
         Assertions.assertTrue(capabilities.supportsInsertAndGetReturning());
         Assertions.assertTrue(capabilities.supportsUpdateAndGetReturning());
         Assertions.assertTrue(capabilities.supportsLastInsertId());
+    }
+
+    @Test
+    void clickHouseDialectExposesAnalyticalCapabilities() {
+        DialectCapabilities capabilities = DialectDriverRegistry.getDialect("clickhouse", null).getCapabilities();
+
+        Assertions.assertEquals(
+                DialectCapabilities.of(
+                        false,
+                        false,
+                        LastInsertIdStrategy.NONE,
+                        WriteReturnStrategy.NONE,
+                        UpdateAndGetStrategy.NONE
+                ),
+                capabilities
+        );
+        Assertions.assertFalse(capabilities.supportsLastInsertId());
+        Assertions.assertFalse(capabilities.supportsInsertAndGet());
+        Assertions.assertFalse(capabilities.supportsUpdateAndGet());
+        Assertions.assertEquals(ReadAfterWriteSafety.UNSUPPORTED, capabilities.lastInsertIdSafety());
+        Assertions.assertEquals(ReadAfterWriteSafety.UNSUPPORTED, capabilities.insertAndGetSafety());
+        Assertions.assertEquals(ReadAfterWriteSafety.UNSUPPORTED, capabilities.updateAndGetSafety());
     }
 
     @Test
@@ -164,6 +191,14 @@ class AgtySQLDialectCapabilitiesTest {
         Assertions.assertEquals(ReadAfterWriteSafety.ATOMIC, mssql.insertAndGetSafety());
         Assertions.assertEquals(ReadAfterWriteSafety.ATOMIC, mssql.updateAndGetSafety());
         Assertions.assertEquals(ReadAfterWriteSafety.CONNECTION_SCOPED, mssql.lastInsertIdSafety());
+
+        DialectCapabilities clickhouse = DialectDriverRegistry
+                .getDialect("clickhouse", null)
+                .getCapabilities();
+
+        Assertions.assertEquals(ReadAfterWriteSafety.UNSUPPORTED, clickhouse.insertAndGetSafety());
+        Assertions.assertEquals(ReadAfterWriteSafety.UNSUPPORTED, clickhouse.updateAndGetSafety());
+        Assertions.assertEquals(ReadAfterWriteSafety.UNSUPPORTED, clickhouse.lastInsertIdSafety());
     }
 
     @Test
@@ -203,6 +238,13 @@ class AgtySQLDialectCapabilitiesTest {
                 DialectFeatureSupport.UNSUPPORTED,
                 DialectFeatureSupport.ALTERNATIVE_SYNTAX,
                 DialectFeatureSupport.SUPPORTED
+        );
+        assertFeatures(
+                "clickhouse",
+                DialectFeatureSupport.UNSUPPORTED,
+                DialectFeatureSupport.UNSUPPORTED,
+                DialectFeatureSupport.UNSUPPORTED,
+                DialectFeatureSupport.UNSUPPORTED
         );
     }
 
@@ -288,6 +330,16 @@ class AgtySQLDialectCapabilitiesTest {
             DialectFeatureSupport upsert,
             DialectFeatureSupport selectForUpdate
     ) {
+        assertFeatures(driver, deleteReturning, upsert, selectForUpdate, DialectFeatureSupport.JDBC_DRIVER);
+    }
+
+    private void assertFeatures(
+            String driver,
+            DialectFeatureSupport deleteReturning,
+            DialectFeatureSupport upsert,
+            DialectFeatureSupport selectForUpdate,
+            DialectFeatureSupport generatedKeys
+    ) {
         DialectFeatureSet features = DialectDriverRegistry
                 .getDialect(driver, null)
                 .getFeatureSet();
@@ -296,10 +348,7 @@ class AgtySQLDialectCapabilitiesTest {
         Assertions.assertEquals(upsert, features.support(DialectFeature.UPSERT));
         Assertions.assertEquals(selectForUpdate, features.support(DialectFeature.SELECT_FOR_UPDATE));
         Assertions.assertEquals(DialectFeatureSupport.JDBC_DRIVER, features.support(DialectFeature.JDBC_BATCH));
-        Assertions.assertEquals(
-                DialectFeatureSupport.JDBC_DRIVER,
-                features.support(DialectFeature.JDBC_GENERATED_KEYS)
-        );
+        Assertions.assertEquals(generatedKeys, features.support(DialectFeature.JDBC_GENERATED_KEYS));
         Assertions.assertEquals(
                 DialectFeatureSupport.JDBC_DRIVER,
                 features.support(DialectFeature.POSITIONAL_PARAMETERS)

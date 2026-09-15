@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+## 2.3.0 - 2026-09-15
+
+### Added
+- Added a local Docker installer for a ClickHouse test database, publishing
+  ClickHouse HTTP/JDBC port `8123` as `28123` and native TCP port `9000` as
+  `29000`.
+- Added the initial ClickHouse JDBC dialect, configuration sample, optional
+  runtime JDBC dependency, capability matrix entries, and user-guide pages.
+
+### Changed
+- The ClickHouse Docker installer now uses `agty_sql` as the default local test
+  password while still allowing `AGTY_SQL_CLICKHOUSE_PASSWORD` overrides.
+- The ClickHouse Docker installer now uses non-sudo Docker access when
+  available, falling back to `sudo docker` only when needed.
+
 ## 2.2.1 - 2026-09-09
 
 ### Fixed

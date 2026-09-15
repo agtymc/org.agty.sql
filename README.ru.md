@@ -9,7 +9,7 @@ entity/model-слоем.
 
 ## Поддерживаемые Драйверы
 
-Актуальная поддержка SQL-драйверов в `2.2.1`:
+Актуальная поддержка SQL-драйверов в `2.3.0`:
 
 - MySQL
 - MariaDB
@@ -17,6 +17,7 @@ entity/model-слоем.
 - MSSQL (SQL Server)
 - SQLite
 - H2
+- ClickHouse
 
 Замечания по драйверам:
 
@@ -25,7 +26,10 @@ entity/model-слоем.
 - PostgreSQL и MSSQL поддерживают native row-return для
   `insertAndGet()` / `updateAndGet()`.
 - SQLite и H2 подходят как file-based варианты для локальной разработки.
+- ClickHouse поддерживается для аналитических read/insert сценариев; write-return
+  методы `insertAndGet()` / `updateAndGet()` отключены capability-моделью.
 - Для локального MSSQL теперь есть `install/install-mssql.sh`.
+- Для локального ClickHouse теперь есть `install/install-clickhouse.sh`.
 
 ## Документация
 
@@ -61,7 +65,7 @@ entity/model-слоем.
     <dependency>
         <groupId>org.agty</groupId>
         <artifactId>org-agty-sql</artifactId>
-        <version>2.2.1</version>
+        <version>2.3.0</version>
     </dependency>
 </dependencies>
 ```
@@ -88,10 +92,10 @@ entity/model-слоем.
 
 ```bash
 mvn install:install-file \
-  -Dfile=path/to/org-agty-sql-2.2.1.jar \
+  -Dfile=path/to/org-agty-sql-2.3.0.jar \
   -DgroupId=org.agty \
   -DartifactId=org-agty-sql \
-  -Dversion=2.2.1 \
+  -Dversion=2.3.0 \
   -Dpackaging=jar
 ```
 
@@ -101,7 +105,7 @@ mvn install:install-file \
 <dependency>
     <groupId>org.agty</groupId>
     <artifactId>org-agty-sql</artifactId>
-    <version>2.2.1</version>
+    <version>2.3.0</version>
 </dependency>
 ```
 

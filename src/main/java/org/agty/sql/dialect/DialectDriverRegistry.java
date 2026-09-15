@@ -1,6 +1,7 @@
 package org.agty.sql.dialect;
 
 import org.agty.sql.AgtySQL;
+import org.agty.sql.dialect.clickhouse.ClickHouse;
 import org.agty.sql.dialect.emptysql.EmptySQL;
 import org.agty.sql.dialect.h2.H2;
 import org.agty.sql.dialect.mariadb.MariaDB;
@@ -46,6 +47,9 @@ public final class DialectDriverRegistry {
             }
             case "mssql" -> {
                 return new MsSQL(agtySQL);
+            }
+            case "clickhouse" -> {
+                return new ClickHouse(agtySQL);
             }
             case "emptysql" -> {
                 return new EmptySQL(agtySQL);

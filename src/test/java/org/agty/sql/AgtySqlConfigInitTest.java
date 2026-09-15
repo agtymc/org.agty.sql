@@ -54,6 +54,18 @@ class AgtySqlConfigInitTest {
     }
 
     @Test
+    void loadsClickHouseSectionFromDefaultConfig() {
+        AgtySqlConfig config = new AgtySqlConfigInit("clickhouse", "config.ini-sample").getConfig();
+
+        assertEquals("clickhouse", config.getDriver());
+        assertEquals("localhost", config.getServer());
+        assertEquals(28123, config.getPort());
+        assertEquals("agty_sql", config.getUser());
+        assertEquals("agty_sql", config.getPassword());
+        assertEquals("agty_sql", config.getDatabase());
+    }
+
+    @Test
     void loadsFileDatabaseSectionsFromDefaultConfig() {
         AgtySqlConfig sqlite = new AgtySqlConfigInit("sqlite", "config.ini-sample").getConfig();
         AgtySqlConfig h2 = new AgtySqlConfigInit("h2", "config.ini-sample").getConfig();
