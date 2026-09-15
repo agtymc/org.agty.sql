@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 2.3.1 - 2026-09-15
+
+### Changed
+- Updated the optional H2 runtime dependency to `2.5.250`.
+- Updated the SpotBugs Maven Plugin to `4.10.4.1`.
+
 ### Fixed
 - Pinned safe transitive versions for the optional ClickHouse JDBC dependency:
   Apache HttpComponents Client `5.6.3`, HttpComponents Core `5.4.3`, and

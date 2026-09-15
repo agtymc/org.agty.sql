@@ -9,7 +9,7 @@ Source repository: `https://github.com/agtymc/org.agty.sql`
 
 ## Supported Drivers
 
-Current SQL driver support in `2.3.0`:
+Current SQL driver support in `2.3.1`:
 
 - MySQL
 - MariaDB
@@ -65,7 +65,7 @@ Then add the dependency:
     <dependency>
         <groupId>org.agty</groupId>
         <artifactId>org-agty-sql</artifactId>
-        <version>2.3.0</version>
+        <version>2.3.1</version>
     </dependency>
 </dependencies>
 ```
@@ -92,10 +92,10 @@ When the JAR is packaged, add it to your project in one of these ways:
 
 ```bash
 mvn install:install-file \
-  -Dfile=path/to/org-agty-sql-2.3.0.jar \
+  -Dfile=path/to/org-agty-sql-2.3.1.jar \
   -DgroupId=org.agty \
   -DartifactId=org-agty-sql \
-  -Dversion=2.3.0 \
+  -Dversion=2.3.1 \
   -Dpackaging=jar
 ```
 
@@ -105,7 +105,7 @@ Then use the regular Maven dependency:
 <dependency>
     <groupId>org.agty</groupId>
     <artifactId>org-agty-sql</artifactId>
-    <version>2.3.0</version>
+    <version>2.3.1</version>
 </dependency>
 ```
 

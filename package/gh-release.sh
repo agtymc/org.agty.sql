@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Publication workflow extracts this version's release notes from CHANGELOG.md.
-RELEASE_VERSION="2.3.0"
+RELEASE_VERSION="2.3.1"
 VERSION="${1:-${RELEASE_VERSION}}"
 TAG="v${VERSION}"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
