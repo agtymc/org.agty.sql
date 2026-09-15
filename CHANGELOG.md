@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Fixed
+- Pinned safe transitive versions for the optional ClickHouse JDBC dependency:
+  Apache HttpComponents Client `5.6.3`, HttpComponents Core `5.4.3`, and
+  lz4-java `1.11.1`, resolving OSV findings reported by dependency security CI.
+
 ## 2.3.0 - 2026-09-15
 
 ### Added
